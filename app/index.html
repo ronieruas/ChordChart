@@ -5,22 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ChordChart Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
         }
-        .chord-output, .lyric-output {
+        .chord-output, .lyric-output, .summary-chord {
             font-family: 'Roboto Mono', monospace;
             line-height: 1.6;
         }
-        .chord-output {
+        .chord-output, .summary-chord {
             font-weight: 700;
+        }
+        #outputArea {
+            transition: column-count 0.3s ease-in-out;
         }
         .output-container.two-columns {
             column-count: 2;
             column-gap: 2.5rem;
+        }
+        .section-container {
+            break-inside: avoid; /* Evita que uma seção quebre no meio de duas colunas */
         }
         #view-wrapper {
             transition: all 0.3s ease-in-out;
@@ -31,15 +37,24 @@
         .view-mobile { width: 425px; }
 
         @media print {
-            .no-print, .no-print * { display: none !important; }
-            body { background-color: white !important; }
-            .output-container, #outputArea, .p-8 {
+            .no-print { display: none !important; }
+            body { background-color: white !important; margin: 0; padding: 0; }
+            main { padding: 0 !important; }
+            #view-wrapper {
+                width: 100% !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 1cm !important; /* Margem de impressão */
+            }
+            #outputArea {
                 padding: 0 !important;
-                margin: 0 !important;
                 box-shadow: none !important;
                 border: none !important;
             }
-            .output-container.two-columns { column-count: 2; }
+            .output-container.two-columns { column-count: 2 !important; }
+            h2, h3 { color: black !important; }
+            .chord-output, .summary-chord { color: #1e40af !important; }
+            .lyric-output { color: #111827 !important; }
         }
     </style>
 </head>
@@ -53,7 +68,7 @@
             <!-- ENTRADA DA MÚSICA -->
             <div class="mb-4">
                 <label for="songInput" class="block text-sm font-medium text-gray-700 mb-1">Cole a cifra aqui:</label>
-                <textarea id="songInput" rows="12" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm" placeholder="[Intro]&#10;G D Em C&#10;..."></textarea>
+                <textarea id="songInput" rows="10" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm" placeholder="[Intro]&#10;G D Em C&#10;..."></textarea>
             </div>
             <button id="generateButton" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-sm mb-6">
                 Gerar Cifra e Mapa
@@ -75,7 +90,7 @@
 
                 <!-- FORMATAÇÃO -->
                 <div>
-                    <h3 class="font-semibold text-gray-800 mb-2">Formatação</h3>
+                    <h3 class="font-semibold text-gray-800 mb-2">Formatação da Cifra</h3>
                     <div class="space-y-3 bg-gray-50 p-3 rounded-md">
                         <div class="flex items-center justify-between">
                             <label for="lyrics-size" class="text-sm">Letra:</label>
@@ -95,7 +110,7 @@
                     <h3 class="font-semibold text-gray-800 mb-2">Layout e Visualização</h3>
                     <div class="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-md">
                         <button id="view-mode-toggle" class="bg-gray-200 py-2 rounded-md text-sm">Ver Mapa</button>
-                        <button id="columns-toggle" class="bg-gray-200 py-2 rounded-md text-sm">2 Colunas</button>
+                        <button id="columns-toggle" class="bg-gray-200 py-2 rounded-md text-sm">Usar 2 Colunas</button>
                         <button onclick="window.print()" class="col-span-2 bg-green-600 text-white hover:bg-green-700 py-2 rounded-md text-sm">Imprimir / Salvar PDF</button>
                     </div>
                      <div class="flex justify-center gap-2 mt-2 bg-gray-50 p-3 rounded-md">
@@ -113,6 +128,7 @@
                 <div id="outputArea" class="output-container">
                     <p class="text-gray-500 italic">Gere uma cifra para ver o resultado aqui.</p>
                 </div>
+                <div id="summaryArea" class="mt-8"></div>
             </div>
         </main>
     </div>
@@ -121,7 +137,6 @@
     // --- STATE MANAGEMENT ---
     const state = {
         songStructure: [],
-        uniqueChords: [],
         transposeAmount: 0,
         currentView: 'chart', // 'chart' or 'map'
         isTwoColumns: false,
@@ -138,6 +153,7 @@
     const songInput = document.getElementById('songInput');
     const generateButton = document.getElementById('generateButton');
     const outputArea = document.getElementById('outputArea');
+    const summaryArea = document.getElementById('summaryArea');
     const transposeUpBtn = document.getElementById('transpose-up');
     const transposeDownBtn = document.getElementById('transpose-down');
     const transposeStatus = document.getElementById('transpose-status');
@@ -167,7 +183,6 @@
 
     function transposeNote(note, amount) {
         const scale = note.includes('b') ? FLAT_SCALE : SHARP_SCALE;
-        const normNote = note.replace('b', '#').replace('D#', 'Eb').replace('G#', 'Ab').replace('A#', 'Bb'); // Simple normalization for lookup
         let scaleToUse = SHARP_SCALE;
         let noteIndex = scaleToUse.indexOf(note);
         if(noteIndex === -1){
@@ -175,7 +190,7 @@
             if(noteIndex > -1) scaleToUse = FLAT_SCALE;
         }
 
-        if (noteIndex === -1) return note; // Not a transposable note
+        if (noteIndex === -1) return note;
 
         const newIndex = (noteIndex + amount + 12) % 12;
         return scaleToUse[newIndex];
@@ -204,6 +219,39 @@
         return transposedMain;
     }
 
+    function formatChordSequenceWithPatterns(chords, transposeAmount) {
+        const transposedChords = chords.map(c => transposeChord(c, transposeAmount));
+        if (!transposedChords || transposedChords.length === 0) return "";
+        let result = [];
+        let i = 0;
+        while (i < transposedChords.length) {
+            let foundPattern = false;
+            for (let len = Math.floor((transposedChords.length - i) / 2); len >= 1; len--) {
+                const pattern = transposedChords.slice(i, i + len);
+                let repetitions = 1;
+                while (i + (repetitions + 1) * len <= transposedChords.length) {
+                    const nextSegment = transposedChords.slice(i + repetitions * len, i + (repetitions + 1) * len);
+                    if (JSON.stringify(pattern) === JSON.stringify(nextSegment)) {
+                        repetitions++;
+                    } else {
+                        break;
+                    }
+                }
+                if (repetitions > 1) {
+                    result.push(`(${pattern.join(' ')}) ${repetitions}x`);
+                    i += repetitions * len;
+                    foundPattern = true;
+                    break;
+                }
+            }
+            if (!foundPattern) {
+                result.push(transposedChords[i]);
+                i++;
+            }
+        }
+        return result.join(' ');
+    }
+
     function parseSong(text) {
         const lines = text.split('\n');
         const structure = [];
@@ -223,7 +271,7 @@
                 structure.push(currentSection);
             }
             if (trimmed === "") {
-                currentSection.items.push({ type: 'spacer' });
+                if(currentSection.items.length > 0) currentSection.items.push({ type: 'spacer' });
                 return;
             }
             if (isPotentiallyChordLine(line)) {
@@ -236,7 +284,8 @@
                     currentSection.items.push({ type: 'chords', chords: line });
                 }
             } else {
-                const prevLine = lines[i - 1] || '';
+                const prevLine = i > 0 ? lines[i - 1] : '';
+                // Only add lyrics if not preceded by a chord line (which handles its own lyrics)
                 if (!isPotentiallyChordLine(prevLine)) {
                      currentSection.items.push({ type: 'lyrics', lyrics: line });
                 }
@@ -248,33 +297,35 @@
     
     // --- RENDERING LOGIC ---
     function applyStyles() {
+        const existingStyle = document.getElementById('dynamic-styles');
+        if (existingStyle) existingStyle.remove();
+        
         const styleSheet = document.createElement("style");
+        styleSheet.id = 'dynamic-styles';
         styleSheet.innerText = `
             .lyric-output { 
                 font-size: ${state.ui.lyricsSize}px; 
                 color: ${state.ui.lyricsColor};
             }
-            .chord-output { 
+            .chord-output, .summary-chord { 
                 font-size: ${state.ui.chordsSize}px; 
                 color: ${state.ui.chordsColor};
             }
         `;
         document.head.appendChild(styleSheet);
-        // Clean up old stylesheets
-        const oldSheets = document.querySelectorAll('style');
-        if(oldSheets.length > 5) oldSheets[0].remove();
     }
     
     function render() {
         if (state.songStructure.length === 0) {
             outputArea.innerHTML = '<p class="text-gray-500 italic">Gere uma cifra para ver o resultado aqui.</p>';
+            summaryArea.innerHTML = '';
             return;
         }
 
         outputArea.innerHTML = '';
         state.songStructure.forEach(section => {
             const sectionDiv = document.createElement('div');
-            sectionDiv.className = 'mb-6 break-inside-avoid';
+            sectionDiv.className = 'mb-6 section-container';
 
             const header = document.createElement('h3');
             header.className = 'text-lg font-bold text-gray-800 mb-2';
@@ -283,7 +334,7 @@
 
             section.items.forEach(item => {
                 if (item.type === 'pair') {
-                    const chords = item.chords.trim().split(/\s+/).map(c => transposeChord(c, state.transposeAmount)).join(' ');
+                    const chords = item.chords.split(/\s+/).filter(Boolean).map(c => transposeChord(c, state.transposeAmount)).join(' ');
                     const chordsDiv = document.createElement('div');
                     chordsDiv.className = 'chord-output whitespace-pre-wrap';
                     chordsDiv.textContent = chords.padEnd(item.chords.length);
@@ -293,8 +344,8 @@
                     sectionDiv.appendChild(chordsDiv);
                     sectionDiv.appendChild(lyricsDiv);
                 } else if (item.type === 'chords') {
-                    const chords = item.chords.trim().split(/\s+/).map(c => transposeChord(c, state.transposeAmount)).join(' ');
-                     const chordsDiv = document.createElement('div');
+                    const chords = item.chords.split(/\s+/).filter(Boolean).map(c => transposeChord(c, state.transposeAmount)).join(' ');
+                    const chordsDiv = document.createElement('div');
                     chordsDiv.className = 'chord-output whitespace-pre-wrap mb-2';
                     chordsDiv.textContent = chords;
                     sectionDiv.appendChild(chordsDiv);
@@ -303,18 +354,38 @@
                     lyricsDiv.className = 'lyric-output whitespace-pre-wrap';
                     lyricsDiv.textContent = item.lyrics;
                     sectionDiv.appendChild(lyricsDiv);
+                } else if (item.type === 'spacer') {
+                    const spacerDiv = document.createElement('div');
+                    spacerDiv.className = 'h-4';
+                    sectionDiv.appendChild(spacerDiv);
                 }
             });
 
             if (state.currentView === 'map') {
                 const sequenceBox = document.createElement('div');
                 sequenceBox.className = 'mt-3 p-2 bg-gray-50 rounded-md text-sm';
-                const sequenceText = section.chordSequence.map(c => transposeChord(c, state.transposeAmount)).join(' ');
-                sequenceBox.innerHTML = `<span class="font-semibold text-gray-600">Sequência:</span> <span class="chord-output">${sequenceText}</span>`;
+                const sequenceText = formatChordSequenceWithPatterns(section.chordSequence, state.transposeAmount);
+                sequenceBox.innerHTML = `<span class="font-semibold text-gray-600">Sequência:</span> <span class="summary-chord">${sequenceText}</span>`;
                 sectionDiv.appendChild(sequenceBox);
             }
             outputArea.appendChild(sectionDiv);
         });
+
+        // Render Summary
+        summaryArea.innerHTML = '';
+        const summaryTitle = document.createElement('h2');
+        summaryTitle.className = 'text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4';
+        summaryTitle.textContent = 'Estrutura Completa da Música';
+        const summaryContent = document.createElement('div');
+        summaryContent.className = 'p-4 bg-blue-50 rounded-lg text-sm leading-relaxed';
+        summaryContent.innerHTML = state.songStructure
+            .filter(s => s.chordSequence.length > 0)
+            .map(s => `<strong class="text-blue-800">[${s.name}]</strong> <span class="summary-chord">(${formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount)})</span>`)
+            .join(' <span class="font-bold text-blue-400">&rarr;</span> ');
+        
+        summaryArea.appendChild(summaryTitle);
+        summaryArea.appendChild(summaryContent);
+
         applyStyles();
     }
 
@@ -333,12 +404,7 @@
     }
 
     function updateTransposeStatus() {
-        if (state.transposeAmount === 0) {
-            transposeStatus.textContent = 'Original';
-        } else {
-            const sign = state.transposeAmount > 0 ? '+' : '';
-            transposeStatus.textContent = `${sign}${state.transposeAmount}`;
-        }
+        transposeStatus.textContent = state.transposeAmount === 0 ? 'Original' : `${state.transposeAmount > 0 ? '+' : ''}${state.transposeAmount}`;
     }
 
     function handleStyleChange(key, value) {
@@ -355,7 +421,7 @@
     function handleColumnsToggle(){
         state.isTwoColumns = !state.isTwoColumns;
         outputArea.classList.toggle('two-columns', state.isTwoColumns);
-        columnsToggle.textContent = state.isTwoColumns ? '1 Coluna' : '2 Colunas';
+        columnsToggle.textContent = state.isTwoColumns ? 'Usar 1 Coluna' : 'Usar 2 Colunas';
     }
     
     function handleDeviceViewToggle(device){
@@ -382,9 +448,9 @@
         btn.addEventListener('click', (e) => handleDeviceViewToggle(e.currentTarget.dataset.view));
     });
 
-    // Load example
     if (songInput.value.trim() === "") {
             songInput.value = `[Intro]
+G D Em C
 G D Em C
 
 [Verso 1]
@@ -407,4 +473,3 @@ Tão maravilhoso para mim`;
     </script>
 </body>
 </html>
-
