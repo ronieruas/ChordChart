@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChordChart Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chord-output, .lyric-output {
+            font-family: 'Roboto Mono', monospace;
+            line-height: 1.6;
+        }
+        .chord-output {
+            font-weight: 700;
+        }
+        .output-container.two-columns {
+            column-count: 2;
+            column-gap: 2.5rem;
+        }
+        #view-wrapper {
+            transition: all 0.3s ease-in-out;
+            border: 1px solid #e5e7eb;
+            margin: auto;
+        }
+        .view-tablet { width: 768px; }
+        .view-mobile { width: 425px; }
+
+        @media print {
+            .no-print, .no-print * { display: none !important; }
+            body { background-color: white !important; }
+            .output-container, #outputArea, .p-8 {
+                padding: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+            .output-container.two-columns { column-count: 2; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex flex-col lg:flex-row min-h-screen">
+        <!-- PAINEL DE CONTROLE (ESQUERDA) -->
+        <aside class="w-full lg:w-96 bg-white p-6 shadow-lg lg:h-screen lg:sticky lg:top-0 overflow-y-auto no-print">
+            <h1 class="text-2xl font-bold text-blue-700">ChordChart Pro</h1>
+            <p class="text-sm text-gray-500 mb-6">Sua ferramenta de cifras avançada.</p>
+
+            <!-- ENTRADA DA MÚSICA -->
+            <div class="mb-4">
+                <label for="songInput" class="block text-sm font-medium text-gray-700 mb-1">Cole a cifra aqui:</label>
+                <textarea id="songInput" rows="12" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm" placeholder="[Intro]&#10;G D Em C&#10;..."></textarea>
+            </div>
+            <button id="generateButton" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-sm mb-6">
+                Gerar Cifra e Mapa
+            </button>
+
+            <!-- SEÇÃO DE CONTROLES -->
+            <div class="space-y-6">
+                <!-- TRANSPOSIÇÃO -->
+                <div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Tom da Música</h3>
+                    <div class="flex items-center justify-center gap-4 bg-gray-50 p-3 rounded-md">
+                        <button id="transpose-down" class="px-3 py-1 bg-gray-300 rounded-md text-lg font-bold">-</button>
+                        <div class="text-center">
+                            <span id="transpose-status" class="font-bold text-lg text-blue-600">Original</span>
+                        </div>
+                        <button id="transpose-up" class="px-3 py-1 bg-gray-300 rounded-md text-lg font-bold">+</button>
+                    </div>
+                </div>
+
+                <!-- FORMATAÇÃO -->
+                <div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Formatação</h3>
+                    <div class="space-y-3 bg-gray-50 p-3 rounded-md">
+                        <div class="flex items-center justify-between">
+                            <label for="lyrics-size" class="text-sm">Letra:</label>
+                            <input id="lyrics-size" type="range" min="10" max="24" value="14" class="w-2/3">
+                            <input id="lyrics-color" type="color" value="#374151" class="w-8 h-8 p-0 border-none rounded">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <label for="chords-size" class="text-sm">Acordes:</label>
+                            <input id="chords-size" type="range" min="10" max="24" value="14" class="w-2/3">
+                            <input id="chords-color" type="color" value="#2563eb" class="w-8 h-8 p-0 border-none rounded">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LAYOUT -->
+                <div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Layout e Visualização</h3>
+                    <div class="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-md">
+                        <button id="view-mode-toggle" class="bg-gray-200 py-2 rounded-md text-sm">Ver Mapa</button>
+                        <button id="columns-toggle" class="bg-gray-200 py-2 rounded-md text-sm">2 Colunas</button>
+                        <button onclick="window.print()" class="col-span-2 bg-green-600 text-white hover:bg-green-700 py-2 rounded-md text-sm">Imprimir / Salvar PDF</button>
+                    </div>
+                     <div class="flex justify-center gap-2 mt-2 bg-gray-50 p-3 rounded-md">
+                        <button data-view="desktop" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Desktop"><i class="fas fa-desktop"></i></button>
+                        <button data-view="tablet" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Tablet"><i class="fas fa-tablet-alt"></i></button>
+                        <button data-view="mobile" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Mobile"><i class="fas fa-mobile-alt"></i></button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ÁREA DE CONTEÚDO (DIREITA) -->
+        <main class="flex-1 p-4 sm:p-8 bg-gray-100">
+            <div id="view-wrapper" class="bg-white p-8 rounded-lg shadow-inner min-h-full">
+                <div id="outputArea" class="output-container">
+                    <p class="text-gray-500 italic">Gere uma cifra para ver o resultado aqui.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    // --- STATE MANAGEMENT ---
+    const state = {
+        songStructure: [],
+        uniqueChords: [],
+        transposeAmount: 0,
+        currentView: 'chart', // 'chart' or 'map'
+        isTwoColumns: false,
+        ui: {
+            lyricsSize: 14,
+            lyricsColor: '#374151',
+            chordsSize: 14,
+            chordsColor: '#2563eb',
+            viewDevice: 'desktop'
+        }
+    };
+
+    // --- DOM ELEMENTS ---
+    const songInput = document.getElementById('songInput');
+    const generateButton = document.getElementById('generateButton');
+    const outputArea = document.getElementById('outputArea');
+    const transposeUpBtn = document.getElementById('transpose-up');
+    const transposeDownBtn = document.getElementById('transpose-down');
+    const transposeStatus = document.getElementById('transpose-status');
+    const lyricsSizeSlider = document.getElementById('lyrics-size');
+    const chordsSizeSlider = document.getElementById('chords-size');
+    const lyricsColorPicker = document.getElementById('lyrics-color');
+    const chordsColorPicker = document.getElementById('chords-color');
+    const viewModeToggle = document.getElementById('view-mode-toggle');
+    const columnsToggle = document.getElementById('columns-toggle');
+    const viewWrapper = document.getElementById('view-wrapper');
+    
+    // --- CONSTANTS ---
+    const SHARP_SCALE = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
+    const FLAT_SCALE =  ['A', 'Bb', 'B', 'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab'];
+
+    // --- CORE LOGIC: PARSING AND TRANSPOSING ---
+    const isChordToken = (token) => {
+        if (!token) return false;
+        return /^[A-Ga-g]([#b])?(m|min|M|Maj|maj|aug|dim|sus|add|Δ|°|ø)?([1-9][0-5]?)?(\((#|b)?[1-9][0-3]?((,|\s)*(#|b)?[1-9][0-3]?)*\))?(sus[24]?)?([/\\][A-Ga-g]([#b])?)?$/.test(token.trim());
+    };
+    
+    const isPotentiallyChordLine = (line) => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine || /^\[.*\]$/.test(trimmedLine)) return false; 
+        return trimmedLine.split(/\s+/).filter(t => t.length > 0).every(isChordToken);
+    };
+
+    function transposeNote(note, amount) {
+        const scale = note.includes('b') ? FLAT_SCALE : SHARP_SCALE;
+        const normNote = note.replace('b', '#').replace('D#', 'Eb').replace('G#', 'Ab').replace('A#', 'Bb'); // Simple normalization for lookup
+        let scaleToUse = SHARP_SCALE;
+        let noteIndex = scaleToUse.indexOf(note);
+        if(noteIndex === -1){
+            noteIndex = FLAT_SCALE.indexOf(note);
+            if(noteIndex > -1) scaleToUse = FLAT_SCALE;
+        }
+
+        if (noteIndex === -1) return note; // Not a transposable note
+
+        const newIndex = (noteIndex + amount + 12) % 12;
+        return scaleToUse[newIndex];
+    }
+    
+    function transposeChord(chord, amount) {
+        if (amount === 0) return chord;
+        if (!isChordToken(chord)) return chord;
+
+        const [mainChord, bassNote] = chord.split('/');
+        const rootRegex = /^[A-G](?:#|b)?/;
+        const rootMatch = mainChord.match(rootRegex);
+
+        if (!rootMatch) return chord;
+        
+        const root = rootMatch[0];
+        const quality = mainChord.substring(root.length);
+        const newRoot = transposeNote(root, amount);
+        
+        const transposedMain = newRoot + quality;
+
+        if (bassNote) {
+            const newBass = transposeNote(bassNote, amount);
+            return `${transposedMain}/${newBass}`;
+        }
+        return transposedMain;
+    }
+
+    function parseSong(text) {
+        const lines = text.split('\n');
+        const structure = [];
+        let currentSection = null;
+
+        const createSection = (name) => ({ name, items: [], chordSequence: [] });
+
+        lines.forEach((line, i) => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                currentSection = createSection(trimmed.substring(1, trimmed.length - 1));
+                structure.push(currentSection);
+                return;
+            }
+            if (!currentSection) {
+                currentSection = createSection('Introdução/Início');
+                structure.push(currentSection);
+            }
+            if (trimmed === "") {
+                currentSection.items.push({ type: 'spacer' });
+                return;
+            }
+            if (isPotentiallyChordLine(line)) {
+                const chords = line.trim().split(/\s+/).filter(Boolean);
+                currentSection.chordSequence.push(...chords);
+                const nextLine = lines[i + 1] || '';
+                if (nextLine.trim() && !isPotentiallyChordLine(nextLine) && !nextLine.trim().startsWith('[')) {
+                    currentSection.items.push({ type: 'pair', chords: line, lyrics: nextLine });
+                } else {
+                    currentSection.items.push({ type: 'chords', chords: line });
+                }
+            } else {
+                const prevLine = lines[i - 1] || '';
+                if (!isPotentiallyChordLine(prevLine)) {
+                     currentSection.items.push({ type: 'lyrics', lyrics: line });
+                }
+            }
+        });
+        
+        return structure.filter(s => s.items.length > 0 || s.chordSequence.length > 0);
+    }
+    
+    // --- RENDERING LOGIC ---
+    function applyStyles() {
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = `
+            .lyric-output { 
+                font-size: ${state.ui.lyricsSize}px; 
+                color: ${state.ui.lyricsColor};
+            }
+            .chord-output { 
+                font-size: ${state.ui.chordsSize}px; 
+                color: ${state.ui.chordsColor};
+            }
+        `;
+        document.head.appendChild(styleSheet);
+        // Clean up old stylesheets
+        const oldSheets = document.querySelectorAll('style');
+        if(oldSheets.length > 5) oldSheets[0].remove();
+    }
+    
+    function render() {
+        if (state.songStructure.length === 0) {
+            outputArea.innerHTML = '<p class="text-gray-500 italic">Gere uma cifra para ver o resultado aqui.</p>';
+            return;
+        }
+
+        outputArea.innerHTML = '';
+        state.songStructure.forEach(section => {
+            const sectionDiv = document.createElement('div');
+            sectionDiv.className = 'mb-6 break-inside-avoid';
+
+            const header = document.createElement('h3');
+            header.className = 'text-lg font-bold text-gray-800 mb-2';
+            header.textContent = section.name;
+            sectionDiv.appendChild(header);
+
+            section.items.forEach(item => {
+                if (item.type === 'pair') {
+                    const chords = item.chords.trim().split(/\s+/).map(c => transposeChord(c, state.transposeAmount)).join(' ');
+                    const chordsDiv = document.createElement('div');
+                    chordsDiv.className = 'chord-output whitespace-pre-wrap';
+                    chordsDiv.textContent = chords.padEnd(item.chords.length);
+                    const lyricsDiv = document.createElement('div');
+                    lyricsDiv.className = 'lyric-output whitespace-pre-wrap';
+                    lyricsDiv.textContent = item.lyrics;
+                    sectionDiv.appendChild(chordsDiv);
+                    sectionDiv.appendChild(lyricsDiv);
+                } else if (item.type === 'chords') {
+                    const chords = item.chords.trim().split(/\s+/).map(c => transposeChord(c, state.transposeAmount)).join(' ');
+                     const chordsDiv = document.createElement('div');
+                    chordsDiv.className = 'chord-output whitespace-pre-wrap mb-2';
+                    chordsDiv.textContent = chords;
+                    sectionDiv.appendChild(chordsDiv);
+                } else if(item.type === 'lyrics'){
+                    const lyricsDiv = document.createElement('div');
+                    lyricsDiv.className = 'lyric-output whitespace-pre-wrap';
+                    lyricsDiv.textContent = item.lyrics;
+                    sectionDiv.appendChild(lyricsDiv);
+                }
+            });
+
+            if (state.currentView === 'map') {
+                const sequenceBox = document.createElement('div');
+                sequenceBox.className = 'mt-3 p-2 bg-gray-50 rounded-md text-sm';
+                const sequenceText = section.chordSequence.map(c => transposeChord(c, state.transposeAmount)).join(' ');
+                sequenceBox.innerHTML = `<span class="font-semibold text-gray-600">Sequência:</span> <span class="chord-output">${sequenceText}</span>`;
+                sectionDiv.appendChild(sequenceBox);
+            }
+            outputArea.appendChild(sectionDiv);
+        });
+        applyStyles();
+    }
+
+    // --- EVENT HANDLERS ---
+    function handleGenerate() {
+        state.songStructure = parseSong(songInput.value);
+        state.transposeAmount = 0;
+        updateTransposeStatus();
+        render();
+    }
+
+    function handleTranspose(amount) {
+        state.transposeAmount += amount;
+        updateTransposeStatus();
+        render();
+    }
+
+    function updateTransposeStatus() {
+        if (state.transposeAmount === 0) {
+            transposeStatus.textContent = 'Original';
+        } else {
+            const sign = state.transposeAmount > 0 ? '+' : '';
+            transposeStatus.textContent = `${sign}${state.transposeAmount}`;
+        }
+    }
+
+    function handleStyleChange(key, value) {
+        state.ui[key] = value;
+        applyStyles();
+    }
+    
+    function handleViewModeToggle(){
+        state.currentView = state.currentView === 'chart' ? 'map' : 'chart';
+        viewModeToggle.textContent = state.currentView === 'chart' ? 'Ver Mapa' : 'Ver Cifra';
+        render();
+    }
+
+    function handleColumnsToggle(){
+        state.isTwoColumns = !state.isTwoColumns;
+        outputArea.classList.toggle('two-columns', state.isTwoColumns);
+        columnsToggle.textContent = state.isTwoColumns ? '1 Coluna' : '2 Colunas';
+    }
+    
+    function handleDeviceViewToggle(device){
+        viewWrapper.classList.remove('view-desktop', 'view-tablet', 'view-mobile');
+        if(device !== 'desktop'){
+            viewWrapper.classList.add(`view-${device}`);
+        }
+    }
+
+    // --- INITIALIZATION ---
+    generateButton.addEventListener('click', handleGenerate);
+    transposeUpBtn.addEventListener('click', () => handleTranspose(1));
+    transposeDownBtn.addEventListener('click', () => handleTranspose(-1));
+    
+    lyricsSizeSlider.addEventListener('input', (e) => handleStyleChange('lyricsSize', e.target.value));
+    chordsSizeSlider.addEventListener('input', (e) => handleStyleChange('chordsSize', e.target.value));
+    lyricsColorPicker.addEventListener('input', (e) => handleStyleChange('lyricsColor', e.target.value));
+    chordsColorPicker.addEventListener('input', (e) => handleStyleChange('chordsColor', e.target.value));
+    
+    viewModeToggle.addEventListener('click', handleViewModeToggle);
+    columnsToggle.addEventListener('click', handleColumnsToggle);
+    
+    document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => handleDeviceViewToggle(e.currentTarget.dataset.view));
+    });
+
+    // Load example
+    if (songInput.value.trim() === "") {
+            songInput.value = `[Intro]
+G D Em C
+
+[Verso 1]
+G              D
+Vim para adorar-te
+Em             C
+Vim para prostrar-me
+G              D           C
+Vim para dizer que és meu Deus
+
+[Refrão]
+G           D/F#
+És totalmente amável
+Em          C
+Totalmente digno
+G         D/F#         C
+Tão maravilhoso para mim`;
+    }
+    handleGenerate();
+    </script>
+</body>
+</html>
+
