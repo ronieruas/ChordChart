@@ -1,12 +1,34 @@
 version: '3.8'
 
 services:
-  web:
-    build:
-      context: ./app
-    container_name: chordchart_pro_web
-    ports:
-      - "8080:80"
+  backend:
+    build: ./backend
+    container_name: chordchart_pro_backend
     restart: unless-stopped
     volumes:
-      - ./app:/usr/share/nginx/html:ro # Monta o diretório da app como somente leitura
+      # O banco de dados e o código ficarão persistidos no host
+      - ./backend:/app
+    networks:
+      - app-network
+
+  frontend:
+    # Construção do frontend permanece simples
+    image: nginx:alpine
+    container_name: chordchart_pro_frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      # Monta nosso HTML e a configuração do Nginx
+      - ./app:/usr/share/nginx/html:ro
+      # Esta configuração é um arquivo que vamos criar no host
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
