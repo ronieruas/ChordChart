@@ -1,5 +1,0 @@
-Alterei a permissão do zfs pool. ChordChart Pro instalado e rodando.  Pontos a resolver. Faltou o Resumo da Estrutura Completa da Música, e a identificação dos padrões. 
-
-Precisamos atualizar a impressão . Deveria imprimir somente a cifra ou o mapa, mas está imprimindo tudo, inclusive os botões de configuração.
-
-O esquema de duas colunas também não está funcionando corretamente. Se trocar a visualização de mapa pra cifra e trocar para uma coluna, não volta para duas colunas se apertar o botão . Vamos corrigir isso depois vamos acrescentar outras coisas.
