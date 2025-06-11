@@ -3,7 +3,7 @@ import sqlite3
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
@@ -40,6 +40,13 @@ def init_db():
     with app.app_context():
         db = get_db()
         cursor = db.cursor()
+        
+        # Check if original_key column exists
+        cursor.execute("PRAGMA table_info(songs)")
+        columns = [column['name'] for column in cursor.fetchall()]
+        if 'original_key' not in columns:
+            cursor.execute("ALTER TABLE songs ADD COLUMN original_key TEXT")
+
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS songs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
