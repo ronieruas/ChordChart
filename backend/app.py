@@ -23,9 +23,7 @@ class User(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
     db = get_db()
-    cursor = db.cursor()
-    user_data = cursor.execute("SELECT id, username FROM users WHERE id = ?", (user_id,)).fetchone()
-    cursor.close()
+    user_data = db.execute("SELECT id, username FROM users WHERE id = ?", (user_id,)).fetchone()
     db.close()
     if user_data:
         return User(id=user_data['id'], username=user_data['username'])
@@ -38,47 +36,38 @@ def get_db():
 
 def init_db():
     with app.app_context():
-        db = get_db()
-        cursor = db.cursor()
-        
-        # Check if original_key column exists
+        conn = get_db()
+        cursor = conn.cursor()
         cursor.execute("PRAGMA table_info(songs)")
         columns = [column['name'] for column in cursor.fetchall()]
         if 'original_key' not in columns:
             cursor.execute("ALTER TABLE songs ADD COLUMN original_key TEXT")
-
+        
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS songs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                content TEXT NOT NULL,
-                original_key TEXT,
+                id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
+                content TEXT NOT NULL, original_key TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )''')
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL
+                id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL
             )''')
-        db.commit()
-        cursor.close()
-        db.close()
+        conn.commit()
+        conn.close()
 
+# --- ROTAS DE AUTENTICAÇÃO E USUÁRIOS ---
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
     db = get_db()
-    cursor = db.cursor()
-    user_data = cursor.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-    cursor.close()
+    user_data = db.execute("SELECT * FROM users WHERE username = ?", (data.get('username'),)).fetchone()
     db.close()
-    if user_data and check_password_hash(user_data['password_hash'], password):
+    if user_data and check_password_hash(user_data['password_hash'], data.get('password')):
         user = User(id=user_data['id'], username=user_data['username'])
         login_user(user)
-        return jsonify({"message": "Login successful", "user": {"username": user.username}})
+        is_admin = user.username == 'admin'
+        return jsonify({"message": "Login successful", "user": {"username": user.username, "is_admin": is_admin}})
     return jsonify({"error": "Credenciais inválidas"}), 401
 
 @app.route('/api/logout', methods=['POST'])
@@ -90,16 +79,40 @@ def logout():
 @app.route('/api/check_auth', methods=['GET'])
 def check_auth():
     if current_user.is_authenticated:
-        return jsonify({"is_logged_in": True, "user": {"username": current_user.username}})
+        is_admin = current_user.username == 'admin'
+        return jsonify({"is_logged_in": True, "user": {"username": current_user.username, "is_admin": is_admin}})
     return jsonify({"is_logged_in": False})
 
+@app.route('/api/users', methods=['POST'])
+@login_required
+def create_user():
+    """Cria um novo usuário. Apenas o usuário 'admin' pode fazer isso."""
+    if current_user.username != 'admin':
+        return jsonify({"error": "Acesso não autorizado"}), 403
+
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    if not username or not password:
+        return jsonify({"error": "Usuário e senha são obrigatórios"}), 400
+
+    password_hash = generate_password_hash(password)
+    conn = get_db()
+    try:
+        conn.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, password_hash))
+        conn.commit()
+        return jsonify({"message": f"Usuário '{username}' criado com sucesso!"}), 201
+    except sqlite3.IntegrityError:
+        return jsonify({"error": f"O usuário '{username}' já existe."}), 409
+    finally:
+        conn.close()
+
+# --- ROTAS DE MÚSICAS (PROTEGIDAS) ---
 @app.route('/api/songs', methods=['GET'])
 @login_required
 def get_songs():
     db = get_db()
-    cursor = db.cursor()
-    songs = cursor.execute('SELECT id, title, original_key FROM songs ORDER BY title ASC').fetchall()
-    cursor.close()
+    songs = db.execute('SELECT id, title, original_key FROM songs ORDER BY title ASC').fetchall()
     db.close()
     return jsonify([dict(song) for song in songs])
 
@@ -107,9 +120,7 @@ def get_songs():
 @login_required
 def get_song(song_id):
     db = get_db()
-    cursor = db.cursor()
-    song = cursor.execute('SELECT content FROM songs WHERE id = ?', (song_id,)).fetchone()
-    cursor.close()
+    song = db.execute('SELECT content FROM songs WHERE id = ?', (song_id,)).fetchone()
     db.close()
     if song is None: return jsonify({'error': 'Song not found'}), 404
     return jsonify(dict(song))
@@ -118,28 +129,22 @@ def get_song(song_id):
 @login_required
 def add_song():
     data = request.get_json()
-    title = data.get('title')
-    content = data.get('content')
-    original_key = data.get('original_key')
-    db = get_db()
-    cursor = db.cursor()
+    conn = get_db()
+    cursor = conn.cursor()
     cursor.execute('INSERT INTO songs (title, content, original_key) VALUES (?, ?, ?)',
-                   (title, content, original_key))
-    db.commit()
+                   (data.get('title'), data.get('content'), data.get('original_key')))
+    conn.commit()
     new_song_id = cursor.lastrowid
-    cursor.close()
-    db.close()
-    return jsonify({'id': new_song_id, 'title': title}), 201
+    conn.close()
+    return jsonify({'id': new_song_id, 'title': data.get('title')}), 201
 
 @app.route('/api/songs/<int:song_id>', methods=['DELETE'])
 @login_required
 def delete_song(song_id):
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute('DELETE FROM songs WHERE id = ?', (song_id,))
-    db.commit()
-    cursor.close()
-    db.close()
+    conn = get_db()
+    conn.execute('DELETE FROM songs WHERE id = ?', (song_id,))
+    conn.commit()
+    conn.close()
     return jsonify({'message': 'Song deleted successfully'})
 
 init_db()
