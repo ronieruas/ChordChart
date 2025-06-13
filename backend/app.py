@@ -158,7 +158,6 @@ def change_password():
     return jsonify({"message": "Senha alterada com sucesso"})
 
 # --- ROTAS DE MÚSICAS ---
-# (As rotas de /api/songs/... permanecem as mesmas e foram omitidas por brevidade)
 @app.route('/api/songs', methods=['GET'])
 @login_required
 def get_songs():
