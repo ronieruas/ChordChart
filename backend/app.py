@@ -38,6 +38,8 @@ def init_db():
     with app.app_context():
         conn = get_db()
         cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=off")
+        cursor.execute("BEGIN TRANSACTION")
         cursor.execute("PRAGMA table_info(songs)")
         columns = [column['name'] for column in cursor.fetchall()]
         if 'original_key' not in columns:
@@ -54,6 +56,7 @@ def init_db():
                 id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL
             )''')
         conn.commit()
+        cursor.execute("PRAGMA foreign_keys=on")
         conn.close()
 
 # --- ROTAS DE AUTENTICAÇÃO E USUÁRIOS ---
@@ -86,16 +89,13 @@ def check_auth():
 @app.route('/api/users', methods=['POST'])
 @login_required
 def create_user():
-    """Cria um novo usuário. Apenas o usuário 'admin' pode fazer isso."""
     if current_user.username != 'admin':
         return jsonify({"error": "Acesso não autorizado"}), 403
-
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
     if not username or not password:
         return jsonify({"error": "Usuário e senha são obrigatórios"}), 400
-
     password_hash = generate_password_hash(password)
     conn = get_db()
     try:
@@ -107,7 +107,58 @@ def create_user():
     finally:
         conn.close()
 
-# --- ROTAS DE MÚSICAS (PROTEGIDAS) ---
+@app.route('/api/users', methods=['GET'])
+@login_required
+def get_users():
+    if current_user.username != 'admin':
+        return jsonify({"error": "Acesso não autorizado"}), 403
+    db = get_db()
+    users = db.execute('SELECT id, username FROM users ORDER BY username ASC').fetchall()
+    db.close()
+    return jsonify([dict(user) for user in users])
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@login_required
+def delete_user(user_id):
+    if current_user.username != 'admin':
+        return jsonify({"error": "Acesso não autorizado"}), 403
+    conn = get_db()
+    user_to_delete = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
+    if user_to_delete is None:
+        conn.close()
+        return jsonify({"error": "Usuário não encontrado"}), 404
+    if user_to_delete['username'] == 'admin':
+        conn.close()
+        return jsonify({"error": "Não é permitido deletar o usuário administrador"}), 403
+    conn.execute('DELETE FROM users WHERE id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Usuário deletado com sucesso'})
+
+@app.route('/api/users/change_password', methods=['POST'])
+@login_required
+def change_password():
+    data = request.get_json()
+    old_password = data.get('old_password')
+    new_password = data.get('new_password')
+    if not old_password or not new_password:
+        return jsonify({"error": "Todos os campos são obrigatórios"}), 400
+    
+    conn = get_db()
+    user_data = conn.execute("SELECT password_hash FROM users WHERE id = ?", (current_user.id,)).fetchone()
+    
+    if not check_password_hash(user_data['password_hash'], old_password):
+        conn.close()
+        return jsonify({"error": "Senha antiga incorreta"}), 401
+    
+    new_password_hash = generate_password_hash(new_password)
+    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_password_hash, current_user.id))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Senha alterada com sucesso"})
+
+# --- ROTAS DE MÚSICAS ---
+# (As rotas de /api/songs/... permanecem as mesmas e foram omitidas por brevidade)
 @app.route('/api/songs', methods=['GET'])
 @login_required
 def get_songs():
