@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   backend:
     build: ./backend
@@ -6,7 +8,7 @@ services:
     volumes:
       - ./backend:/app
     env_file:
-      - .env  # Carrega as variáveis do arquivo .env
+      - .env
     networks:
       - app-network
 
@@ -17,6 +19,7 @@ services:
     ports:
       - "8080:80"
     volumes:
+      # Garante que o nginx.conf da raiz do projeto seja usado
       - ./app:/usr/share/nginx/html:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
