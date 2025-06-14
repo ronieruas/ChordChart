@@ -96,7 +96,7 @@
     async function checkAuthStatus() { try { const data = await fetchApi('/api/check_auth'); if (data && data.is_logged_in) { showApp(data.user); } else { showLoginScreen(); } } catch (e) { showLoginScreen(); } }
     async function handleLogin(event) { event.preventDefault(); dom.loginError.classList.add('hidden'); const username = dom.username.value; const password = dom.password.value; try { const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); if (data) { showApp(data.user); } } catch (e) { dom.loginError.textContent = e.message; dom.loginError.classList.remove('hidden'); } }
     async function handleLogout() { await fetchApi('/api/logout', { method: 'POST' }); showLoginScreen(); }
-    async function loadSavedSongs(filter = 'my_songs') { try { const songs = await fetchApi(`/api/songs?filter=${filter}`); dom.modalSongsList.innerHTML = ''; if (!songs || songs.length === 0) { dom.modalSongsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhuma música ${filter === 'public' ? 'pública' : 'sua'} encontrada.</p>`; return; } songs.forEach(song => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2 hover:bg-blue-100 rounded cursor-pointer'; li.innerHTML = `<div class="flex-1 truncate"><span class="text-sm font-medium">${song.title}</span><span class="text-xs text-gray-500 ml-2">(${song.original_key || 'N/A'})</span></div><div class="flex gap-2"><button data-id="${song.id}" class="delete-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button></div>`; li.querySelector('.flex-1').addEventListener('click', () => { handleLoadSong(song.id); dom.songsModal.close(); }); li.querySelector('.delete-btn').addEventListener('click', (e) => { e.stopPropagation(); handleDeleteSong(song.id, song.title); }); dom.modalSongsList.appendChild(li); }); } catch (error) { dom.modalSongsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar músicas.</p>'; } }
+    async function loadSavedSongs(filter = 'my_songs') { try { const songs = await fetchApi(`/api/songs?filter=${filter}`); dom.modalSongsList.innerHTML = ''; if (!songs || songs.length === 0) { dom.modalSongsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhuma música ${filter === 'public' ? 'pública' : 'sua'} encontrada.</p>`; return; } songs.forEach(song => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2 hover:bg-blue-100 rounded cursor-pointer'; li.innerHTML = `<div class="flex-1 truncate"><span class="text-sm font-medium">${song.title}</span><span class="text-xs text-gray-500 ml-2">(${song.original_key || 'N/A'})</span></div><div class="flex gap-2"><button data-id="${song.id}" data-userid="${song.user_id}" class="delete-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button></div>`; li.querySelector('.flex-1').addEventListener('click', () => { handleLoadSong(song.id); dom.songsModal.close(); }); li.querySelector('.delete-btn').addEventListener('click', (e) => { e.stopPropagation(); handleDeleteSong(song.id, song.title); }); dom.modalSongsList.appendChild(li); }); } catch (error) { dom.modalSongsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar músicas.</p>'; } }
     async function handleLoadSong(songId) { try { const song = await fetchApi(`/api/songs/${songId}`); dom.songInput.value = song.content; handleGenerate(); } catch (error) { alert('Não foi possível carregar a música.'); } }
     async function handleDeleteSong(songId, songTitle) { if (confirm(`Tem certeza que deseja deletar "${songTitle}"?`)) { try { await fetchApi(`/api/songs/${songId}`, { method: 'DELETE' }); loadSavedSongs(dom.mySongsTab.classList.contains('active') ? 'my_songs' : 'public'); } catch (error) { alert(error.message); } } }
     async function handleSaveSong(event) { event.preventDefault(); const title = dom.songTitleInput.value; const content = dom.songInput.value; const original_key = dom.originalKeyInput.value; const is_public = dom.isPublicCheckbox.checked; if (!title || !content.trim()) { alert('Título e conteúdo da cifra são obrigatórios.'); return; } try { await fetchApi('/api/songs', { method: 'POST', body: { title, content, original_key, is_public } }); dom.saveModal.close(); dom.saveForm.reset(); } catch (error) { alert('Não foi possível salvar a música.'); } }
@@ -130,31 +130,31 @@
         const allIds = Array.from(document.querySelectorAll('[id]')).reduce((acc, el) => ({...acc, [el.id.replace(/-/g, '_')]: el }), {});
         Object.assign(dom, allIds);
 
-        dom.loginForm.addEventListener('submit', handleLogin);
-        dom.logoutBtn.addEventListener('click', handleLogout);
-        dom.generateButton.addEventListener('click', handleGenerate);
-        dom.clearInputBtn.addEventListener('click', () => { dom.songInput.value = ''; handleGenerate(); });
-        dom.transposeUpBtn.addEventListener('click', () => handleTranspose(1));
-        dom.transposeDownBtn.addEventListener('click', () => handleTranspose(-1));
+        if (dom.loginForm) dom.loginForm.addEventListener('submit', handleLogin);
+        if (dom.logoutBtn) dom.logoutBtn.addEventListener('click', handleLogout);
+        if (dom.generateButton) dom.generateButton.addEventListener('click', handleGenerate);
+        if (dom.clearInputBtn) dom.clearInputBtn.addEventListener('click', () => { dom.songInput.value = ''; handleGenerate(); });
+        if (dom.transposeUpBtn) dom.transposeUpBtn.addEventListener('click', () => handleTranspose(1));
+        if (dom.transposeDownBtn) dom.transposeDownBtn.addEventListener('click', () => handleTranspose(-1));
         [dom.lyricsSizeSlider, dom.chordsSizeSlider, dom.lyricsColorPicker, dom.chordsColorPicker].forEach(el => el?.addEventListener('input', render));
-        dom.viewModeToggle.addEventListener('click', handleViewModeToggle);
-        dom.columnsToggle.addEventListener('click', handleColumnsToggle);
+        if (dom.viewModeToggle) dom.viewModeToggle.addEventListener('click', handleViewModeToggle);
+        if (dom.columnsToggle) dom.columnsToggle.addEventListener('click', handleColumnsToggle);
         document.querySelectorAll('.view-toggle-btn').forEach(b => b.addEventListener('click', e => handleDeviceViewToggle(e.currentTarget.dataset.view)));
-        dom.fullscreenBtn.addEventListener('click', toggleFullscreen);
-        document.addEventListener('fullscreenchange', () => dom.appContainer?.classList.toggle('fullscreen-view', !!document.fullscreenElement));
-        dom.saveButton.addEventListener('click', () => { if (dom.songInput.value.trim()) { dom.saveModal.showModal(); } else { alert("Por favor, cole uma cifra antes de salvar."); } });
+        if (dom.fullscreenBtn) dom.fullscreenBtn.addEventListener('click', toggleFullscreen);
+        if (document) document.addEventListener('fullscreenchange', () => dom.appContainer?.classList.toggle('fullscreen-view', !!document.fullscreenElement));
+        if (dom.saveButton) dom.saveButton.addEventListener('click', () => { if (dom.songInput.value.trim()) { dom.saveModal.showModal(); } else { alert("Por favor, cole uma cifra antes de salvar."); } });
         document.querySelectorAll('.cancel-btn').forEach(b => b.addEventListener('click', (e) => e.target.closest('dialog').close()));
-        dom.saveForm.addEventListener('submit', handleSaveSong);
-        dom.openSongsBtn.addEventListener('click', () => { dom.mySongsTab.click(); dom.songsModal.showModal(); });
-        dom.mySongsTab.addEventListener('click', () => { dom.mySongsTab.classList.add('active'); dom.publicSongsTab.classList.remove('active'); loadSavedSongs('my_songs'); });
-        dom.publicSongsTab.addEventListener('click', () => { dom.publicSongsTab.classList.add('active'); dom.mySongsTab.classList.remove('active'); loadSavedSongs('public'); });
-        dom.manageUsersBtn.addEventListener('click', handleOpenUserManagement);
-        dom.modalUsersList.addEventListener('click', handleDeleteUserFromModal);
-        dom.openCreateUserModalBtn.addEventListener('click', () => { dom.createUserFeedback.classList.add('hidden'); dom.createUserForm.reset(); dom.createUserModal.showModal(); });
-        dom.createUserForm.addEventListener('submit', handleCreateUser);
-        dom.changePasswordBtn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
-        dom.changePasswordForm.addEventListener('submit', handleChangePassword);
-        dom.manageSetlistsBtn.addEventListener('click', handleOpenSetlistManagement);
+        if (dom.saveForm) dom.saveForm.addEventListener('submit', handleSaveSong);
+        if (dom.openSongsBtn) dom.openSongsBtn.addEventListener('click', () => { dom.mySongsTab.click(); dom.songsModal.showModal(); });
+        if (dom.mySongsTab) dom.mySongsTab.addEventListener('click', () => { dom.mySongsTab.classList.add('active'); dom.publicSongsTab.classList.remove('active'); loadSavedSongs('my_songs'); });
+        if (dom.publicSongsTab) dom.publicSongsTab.addEventListener('click', () => { dom.publicSongsTab.classList.add('active'); dom.mySongsTab.classList.remove('active'); loadSavedSongs('public'); });
+        if (dom.manageUsersBtn) dom.manageUsersBtn.addEventListener('click', handleOpenUserManagement);
+        if (dom.modalUsersList) dom.modalUsersList.addEventListener('click', handleDeleteUserFromModal);
+        if (dom.openCreateUserModalBtn) dom.openCreateUserModalBtn.addEventListener('click', () => { dom.createUserFeedback.classList.add('hidden'); dom.createUserForm.reset(); dom.createUserModal.showModal(); });
+        if (dom.createUserForm) dom.createUserForm.addEventListener('submit', handleCreateUser);
+        if (dom.changePasswordBtn) dom.changePasswordBtn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
+        if (dom.changePasswordForm) dom.changePasswordForm.addEventListener('submit', handleChangePassword);
+        if (dom.manageSetlistsBtn) dom.manageSetlistsBtn.addEventListener('click', handleOpenSetlistManagement);
         
         if (dom.songInput && dom.songInput.value.trim() === "") { dom.songInput.value = `[Intro]\nG D Em C\n\n[Verso 1]\n   G              D\nVim para adorar-te\n   Em             C\nVim para prostrar-me\nG              D           C\nVim para dizer que és meu Deus`; }
         checkAuthStatus();
