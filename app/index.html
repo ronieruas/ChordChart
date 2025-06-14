@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .chord-output, .lyric-output, .summary-chord { font-family: 'Roboto Mono', monospace; line-height: 1.6; }
+        .chord-output, .lyric-output, .summary-chord { font-family: 'Roboto Mono', monospace; line-height: 1.6; white-space: pre; }
         .chord-output, .summary-chord { font-weight: 700; }
         #outputArea { transition: column-count 0.3s ease-in-out; }
         .output-container.two-columns { column-count: 2; column-gap: 2.5rem; }
@@ -21,8 +21,11 @@
         .fullscreen-view { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: white; overflow-y: auto; z-index: 9999; padding: 2rem; }
         dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
         .hidden { display: none; }
+        [x-cloak] { display: none !important; }
+        .tab-btn.active { border-color: #3b82f6; background-color: #dbeafe; color: #1e40af; }
         @media print { .no-print { display: none !important; } body { background-color: white !important; margin: 0; padding: 0; } main { padding: 0 !important; } #view-wrapper { width: 100% !important; border: none !important; box-shadow: none !important; padding: 1cm !important; } #outputArea { padding: 0 !important; box-shadow: none !important; border: none !important; } .output-container.two-columns { column-count: 2 !important; } h2, h3 { color: black !important; } .chord-output, .summary-chord { color: #1e40af !important; } .lyric-output { color: #111827 !important; } }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="bg-gray-100">
 
@@ -30,232 +33,134 @@
     <div id="login-container" class="flex items-center justify-center min-h-screen bg-gray-100">
         <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-center text-gray-800">Login - ChordChart Pro</h2>
-            <form id="login-form">
-                <div class="space-y-4">
-                    <div>
-                        <label for="username" class="text-sm font-medium text-gray-700">Usuário</label>
-                        <input id="username" name="username" type="text" required class="w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm">
-                    </div>
-                    <div>
-                        <label for="password" class="text-sm font-medium text-gray-700">Senha</label>
-                        <input id="password" name="password" type="password" required class="w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm">
-                    </div>
-                </div>
-                <p id="login-error" class="text-sm text-red-600 mt-2 hidden">Usuário ou senha inválidos.</p>
-                <button type="submit" class="w-full px-4 py-2 mt-6 font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700">Entrar</button>
-            </form>
+            <form id="login-form"><div class="space-y-4"><div><label for="username" class="text-sm font-medium text-gray-700">Usuário</label><input id="username" name="username" type="text" required class="w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm"></div><div><label for="password" class="text-sm font-medium text-gray-700">Senha</label><input id="password" name="password" type="password" required class="w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm"></div></div><p id="login-error" class="text-sm text-red-600 mt-2 hidden">Usuário ou senha inválidos.</p><button type="submit" class="w-full px-4 py-2 mt-6 font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700">Entrar</button></form>
         </div>
     </div>
 
-    <!-- Container Principal da Aplicação (inicialmente oculto) -->
+    <!-- Container Principal da Aplicação -->
     <div id="app-container" class="hidden flex-col lg:flex-row min-h-screen">
         <aside class="w-full lg:w-96 bg-white p-6 shadow-lg lg:h-screen lg:sticky lg:top-0 overflow-y-auto no-print">
-            <div class="flex justify-between items-center">
-                <h1 class="text-2xl font-bold text-blue-700">ChordChart Pro</h1>
-                <div>
-                    <span id="welcome-user" class="text-sm text-gray-600 mr-4"></span>
-                    <button id="fullscreen-btn" class="p-1 text-gray-500 hover:text-blue-600" title="Tela Cheia"><i class="fas fa-expand"></i></button>
-                    <button id="logout-btn" class="p-1 text-gray-500 hover:text-red-600" title="Sair"><i class="fas fa-sign-out-alt"></i></button>
-                </div>
-            </div>
-            <p class="text-sm text-gray-500 mb-6">Sua ferramenta de cifras avançada.</p>
-            <div class="mb-4">
-                <label for="songInput" class="block text-sm font-medium text-gray-700 mb-1">Cifra Atual:</label>
-                <textarea id="songInput" rows="8" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm" placeholder="[Intro]&#10;G D Em C&#10;..."></textarea>
-                <div class="flex gap-2 mt-2">
-                    <button id="generateButton" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-sm">Gerar</button>
-                    <button id="saveButton" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-md shadow-sm">Salvar</button>
-                </div>
-            </div>
-            <div>
-                 <h3 class="font-semibold text-gray-800 mb-2">Músicas Salvas</h3>
-                 <div id="saved-songs-list" class="bg-gray-50 p-2 rounded-md h-40 overflow-y-auto border"></div>
-            </div>
-            <div class="space-y-6 mt-6">
+            <div class="flex justify-between items-center"><h1 class="text-2xl font-bold text-blue-700">ChordChart Pro</h1><div x-data="{ open: false }" class="relative"><button @click="open = !open" class="p-2 text-gray-600 hover:text-blue-700 focus:outline-none"><i class="fas fa-bars"></i></button><div x-show="open" @click.away="open = false" x-cloak class="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-20"><a href="#" id="change-password-btn" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Alterar Senha</a><a href="#" id="manage-users-btn" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hidden">Gerenciar Usuários</a><a href="#" id="manage-setlists-btn" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Gerenciar Set Lists</a><a href="#" onclick="window.print()" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Imprimir / PDF</a><hr><a href="#" id="logout-btn" class="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sair</a></div></div></div>
+            <div class="flex justify-between items-center mt-2"><span id="welcome-user" class="text-sm text-gray-600"></span><button id="fullscreen-btn" class="p-1 text-gray-500 hover:text-blue-600" title="Tela Cheia"><i class="fas fa-expand"></i></button></div><hr class="my-4">
+            <div class="mb-4"><div class="flex justify-between items-center mb-1"><label for="songInput" class="block text-sm font-medium text-gray-700">Cifra Atual:</label><button id="clear-input-btn" class="text-xs text-gray-400 hover:text-red-500" title="Limpar"><i class="fas fa-times-circle"></i> Limpar</button></div><textarea id="songInput" rows="8" class="w-full p-2 border border-gray-300 rounded-md shadow-sm text-sm" placeholder="[Intro]&#10;G D Em C&#10;..."></textarea><div class="flex gap-2 mt-2"><button id="generateButton" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-sm">Gerar</button><button id="saveButton" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-md shadow-sm">Salvar</button></div></div>
+            <button id="open-songs-btn" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-md shadow-sm mb-4">Abrir Músicas Salvas</button>
+            <div class="space-y-6">
                  <div><h3 class="font-semibold text-gray-800 mb-2">Tom da Música</h3><div class="flex items-center justify-center gap-4 bg-gray-50 p-3 rounded-md"><button id="transpose-down" class="px-3 py-1 bg-gray-300 rounded-md text-lg font-bold">-</button><div class="text-center"><span id="transpose-status" class="font-bold text-lg text-blue-600">Original</span></div><button id="transpose-up" class="px-3 py-1 bg-gray-300 rounded-md text-lg font-bold">+</button></div></div>
-                 <div><h3 class="font-semibold text-gray-800 mb-2">Formatação da Cifra</h3><div class="space-y-3 bg-gray-50 p-3 rounded-md"><div class="flex items-center justify-between"><label for="lyrics-size" class="text-sm">Letra:</label><input id="lyrics-size" type="range" min="10" max="24" value="14" class="w-2/3"><input id="lyrics-color" type="color" value="#374151" class="w-8 h-8 p-0 border-none rounded"></div><div class="flex items-center justify-between"><label for="chords-size" class="text-sm">Acordes:</label><input id="chords-size" type="range" min="10" max="24" value="14" class="w-2/3"><input id="chords-color" type="color" value="#2563eb" class="w-8 h-8 p-0 border-none rounded"></div></div></div>
-                 <div><h3 class="font-semibold text-gray-800 mb-2">Layout e Visualização</h3><div class="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-md"><button id="view-mode-toggle" class="bg-gray-200 py-2 rounded-md text-sm">Ver Mapa</button><button id="columns-toggle" class="bg-gray-200 py-2 rounded-md text-sm">Usar 2 Colunas</button><button onclick="window.print()" class="col-span-2 bg-green-600 text-white hover:bg-green-700 py-2 rounded-md text-sm">Imprimir / Salvar PDF</button></div><div class="flex justify-center gap-2 mt-2 bg-gray-50 p-3 rounded-md"><button data-view="desktop" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Desktop"><i class="fas fa-desktop"></i></button><button data-view="tablet" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Tablet"><i class="fas fa-tablet-alt"></i></button><button data-view="mobile" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Mobile"><i class="fas fa-mobile-alt"></i></button></div></div>
+                 <div><h3 class="font-semibold text-gray-800 mb-2">Formatação da Cifra</h3><div class="space-y-3 bg-gray-50 p-3 rounded-md"><div class="flex items-center justify-between"><label for="lyrics-size" class="text-sm">Letra:</label><input id="lyrics-size" type="range" min="10" max="32" value="16" class="w-2/3"><input id="lyrics-color" type="color" value="#374151" class="w-8 h-8 p-0 border-none rounded"></div><div class="flex items-center justify-between"><label for="chords-size" class="text-sm">Acordes:</label><input id="chords-size" type="range" min="10" max="32" value="16" class="w-2/3"><input id="chords-color" type="color" value="#2563eb" class="w-8 h-8 p-0 border-none rounded"></div></div></div>
+                 <div><h3 class="font-semibold text-gray-800 mb-2">Layout e Visualização</h3><div class="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-md"><button id="view-mode-toggle" class="bg-gray-200 py-2 rounded-md text-sm">Ver Mapa</button><button id="columns-toggle" class="bg-gray-200 py-2 rounded-md text-sm">Usar 2 Colunas</button></div><div class="flex justify-center gap-2 mt-2 bg-gray-50 p-3 rounded-md"><button data-view="desktop" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Desktop"><i class="fas fa-desktop"></i></button><button data-view="tablet" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Tablet"><i class="fas fa-tablet-alt"></i></button><button data-view="mobile" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Mobile"><i class="fas fa-mobile-alt"></i></button></div></div>
             </div>
         </aside>
         <main class="flex-1 p-4 sm:p-8 bg-gray-100">
             <div id="view-wrapper" class="bg-white p-8 rounded-lg shadow-inner min-h-full">
                 <div id="outputArea" class="output-container"></div>
                 <div id="summaryArea" class="mt-8"></div>
+                <div id="uniqueChordsArea" class="mt-8"></div>
             </div>
         </main>
     </div>
 
-    <dialog id="save-modal" class="p-6 rounded-lg shadow-xl border"><h3 class="text-lg font-bold mb-4">Salvar Música</h3><form id="save-form"><label for="song-title-input" class="block text-sm mb-1">Título da Música:</label><input type="text" id="song-title-input" class="w-full p-2 border rounded-md" required><div class="flex justify-end gap-4 mt-6"><button type="button" id="cancel-save-btn" class="py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Salvar</button></div></form></dialog>
+    <!-- Modals -->
+    <dialog id="save-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Salvar Música</h3><form id="save-form"><div class="space-y-4"><label for="song-title-input" class="block text-sm mb-1">Título da Música:</label><input type="text" id="song-title-input" class="w-full p-2 border rounded-md" required><label for="original-key-input" class="block text-sm mb-1">Tom Original:</label><input type="text" id="original-key-input" class="w-full p-2 border rounded-md" placeholder="Ex: G, Am, C#m"><div class="flex items-center mt-2"><input id="is-public-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><label for="is-public-checkbox" class="ml-2 block text-sm text-gray-900">Compartilhar com todos os usuários</label></div></div><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Salvar</button></div></form></dialog>
+    <dialog id="songs-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-lg"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Músicas Salvas</h3><button class="cancel-btn text-2xl font-light">&times;</button></div><div class="border-b border-gray-200 mb-2"><nav class="-mb-px flex gap-4" aria-label="Tabs"><button id="my-songs-tab" class="tab-btn active whitespace-nowrap border-b-2 py-2 px-1 text-sm font-medium">Minhas Músicas</button><button id="public-songs-tab" class="tab-btn whitespace-nowrap border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Todas as Músicas</button></nav></div><div id="modal-songs-list" class="bg-gray-50 p-2 rounded-md h-96 overflow-y-auto border"></div></dialog>
+    <dialog id="setlist-management-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-3xl"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Gerenciar Set Lists</h3><button class="cancel-btn text-2xl font-light">&times;</button></div><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div id="setlist-list-column"></div><div id="setlist-songs-column" class="hidden"></div></div></dialog>
+    <dialog id="create-setlist-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 id="create-setlist-modal-title" class="text-lg font-bold mb-4">Criar Novo Set List</h3><form id="create-setlist-form"><label for="setlist-name-input" class="block text-sm mb-1">Nome do Set List:</label><input type="text" id="setlist-name-input" class="w-full p-2 border rounded-md" required><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Salvar</button></div></form></dialog>
+    <dialog id="add-song-to-setlist-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-lg"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Adicionar Música ao Set List</h3><button class="cancel-btn text-2xl font-light">&times;</button></div><div id="add-song-modal-list" class="bg-gray-50 p-2 rounded-md h-96 overflow-y-auto border"></div></dialog>
+    <dialog id="user-management-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-lg"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Gerenciar Usuários</h3><button id="open-create-user-modal-btn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">Criar Novo</button></div><div id="modal-users-list" class="bg-gray-50 p-2 rounded-md h-80 overflow-y-auto border"></div><div class="flex justify-end mt-4"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Fechar</button></div></dialog>
+    <dialog id="change-password-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Alterar Senha</h3><form id="change-password-form"><div class="space-y-4"><label for="old-password" class="block text-sm mb-1">Senha Antiga:</label><input type="password" id="old-password" class="w-full p-2 border rounded-md" required><label for="new-password" class="block text-sm mb-1">Nova Senha:</label><input type="password" id="new-password" class="w-full p-2 border rounded-md" required></div><p id="change-password-feedback" class="text-sm mt-4 hidden"></p><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Alterar Senha</button></div></form></dialog>
+    <dialog id="create-user-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Criar Novo Usuário</h3><form id="create-user-form"><div class="space-y-4"><label for="new-username" class="block text-sm mb-1">Nome de Usuário:</label><input type="text" id="new-username" class="w-full p-2 border rounded-md" required><label for="new-password" class="block text-sm mb-1">Senha:</label><input type="password" id="new-password" class="w-full p-2 border rounded-md" required></div><p id="create-user-feedback" class="text-sm mt-4 hidden"></p><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Criar Usuário</button></div></form></dialog>
 
     <script>
-    // --- STATE MANAGEMENT ---
-    const state = { songStructure: [], transposeAmount: 0, currentView: 'chart', isTwoColumns: false, ui: { lyricsSize: 14, lyricsColor: '#374151', chordsSize: 14, chordsColor: '#2563eb', viewDevice: 'desktop' } };
+    // --- STATE & DOM ---
+    const state = { songStructure: [], transposeAmount: 0, currentView: 'chart', isTwoColumns: false, currentSetList: null };
+    const dom = {};
 
-    // --- DOM ELEMENTS ---
-    const songInput = document.getElementById('songInput');
-    const generateButton = document.getElementById('generateButton');
-    const saveButton = document.getElementById('saveButton');
-    const outputArea = document.getElementById('outputArea');
-    const summaryArea = document.getElementById('summaryArea');
-    const savedSongsList = document.getElementById('saved-songs-list');
-    const saveModal = document.getElementById('save-modal');
-    const saveForm = document.getElementById('save-form');
-    const cancelSaveBtn = document.getElementById('cancel-save-btn');
-    const songTitleInput = document.getElementById('song-title-input');
-    const fullscreenBtn = document.getElementById('fullscreen-btn');
-    const appContainer = document.getElementById('app-container');
-    const transposeStatus = document.getElementById('transpose-status');
-    const loginContainer = document.getElementById('login-container');
-    const loginForm = document.getElementById('login-form');
-    const loginError = document.getElementById('login-error');
-    const welcomeUser = document.getElementById('welcome-user');
-    const logoutBtn = document.getElementById('logout-btn');
-
-    // --- CONSTANTS & CORE LOGIC (PARSING, TRANSPOSING...) ---
+    // --- CONSTANTS & CORE LOGIC ---
     const SHARP_SCALE = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
-    const FLAT_SCALE =  ['A', 'Bb', 'B', 'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab'];
-    const isChordToken = (t) => t ? /^[A-Ga-g]([#b])?(m|min|M|Maj|maj|aug|dim|sus|add|Δ|°|ø)?([1-9][0-5]?)?(\((#|b)?[1-9][0-3]?((,|\s)*(#|b)?[1-9][0-3]?)*\))?(sus[24]?)?([/\\][A-Ga-g]([#b])?)?$/.test(t.trim()) : false;
-    const isPotentiallyChordLine = (l) => { const t = l.trim(); return t && !/^\[.*\]$/.test(t) ? t.split(/\s+/).filter(Boolean).every(isChordToken) : false; };
-    function transposeNote(n, a) { let s = n.includes('b') ? FLAT_SCALE : SHARP_SCALE; let i = s.indexOf(n); if (i===-1) return n; return s[(i+a+12)%12]; }
-    function transposeChord(c, a) { if (a === 0 || !isChordToken(c)) return c; const [mc, bn] = c.split('/'); const rm = mc.match(/^[A-G](#|b)?/); if (!rm) return c; const r = rm[0]; const q = mc.substring(r.length); const nr = transposeNote(r, a); const tm = nr + q; return bn ? `${tm}/${transposeNote(bn, a)}` : tm; }
+    const FLAT_SCALE = ['A', 'Bb', 'B', 'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab'];
+    const CHORD_REGEX_SOURCE = `[A-Ga-g]([#b])?(m|min|M|Maj|maj|aug|dim|sus|add|Δ|°|ø)?([1-9][0-5]?)?(\\((#|b)?[1-9][0-3]?((,|,\\s)*(\\s|#|b)?[1-9][0-3]?)*\\))?(sus[24]?)?([/\\\\][A-Ga-g]([#b])?)?`;
+    const CHORD_REGEX_GLOBAL = new RegExp(CHORD_REGEX_SOURCE, 'g');
+    function isChordToken(token) { if (!token) return false; const regex = new RegExp(`^${CHORD_REGEX_SOURCE}$`); return regex.test(token.trim()); }
+    const isPotentiallyChordLine = (line) => { const t = line.trim(); if (!t || /^\[.*\]$/.test(t)) return false; const tokens = t.split(/\s+/).filter(Boolean); return tokens.length > 0 && tokens.every(isChordToken); };
+    function transposeNote(n, a) { let s = n.includes('b') ? FLAT_SCALE : SHARP_SCALE; let i = s.indexOf(n); if (i === -1) return n; return s[(i + a + 12) % 12]; }
+    function transposeChord(c, a) { if (a === 0) return c; const rm = c.match(/^[A-G](#|b)?/); if (!rm) return c; const [mc, bn] = c.split('/'); const r = rm[0]; const q = mc.substring(r.length); const nr = transposeNote(r, a); const tm = nr + q; return bn ? `${tm}/${transposeNote(bn, a)}` : tm; }
     function formatChordSequenceWithPatterns(chords, transposeAmount) { const tChords = chords.map(c => transposeChord(c, transposeAmount)); if (!tChords || tChords.length === 0) return ""; let r = [], i = 0; while (i < tChords.length) { let fp = false; for (let l = Math.floor((tChords.length - i) / 2); l >= 1; l--) { const p = tChords.slice(i, i + l); let rep = 1; while (i + (rep + 1) * l <= tChords.length) { const ns = tChords.slice(i + rep * l, i + (rep + 1) * l); if (JSON.stringify(p) === JSON.stringify(ns)) rep++; else break; } if (rep > 1) { r.push(`(${p.join(' ')}) ${rep}x`); i += rep * l; fp = true; break; } } if (!fp) { r.push(tChords[i]); i++; } } return r.join(' '); }
-    function parseSong(text) { const lines = text.split('\n'), structure = []; let section = null; const create = n => ({ name: n, items: [], chordSequence: [] }); lines.forEach((l, i) => { const t = l.trim(); if (t.startsWith('[') && t.endsWith(']')) { section = create(t.substring(1, t.length - 1)); structure.push(section); return; } if (!section) { section = create('Introdução/Início'); structure.push(section); } if (t === "") { if (section.items.length > 0) section.items.push({ type: 'spacer' }); return; } if (isPotentiallyChordLine(l)) { const chords = l.trim().split(/\s+/).filter(Boolean); section.chordSequence.push(...chords); const nl = lines[i + 1] || ''; if (nl.trim() && !isPotentiallyChordLine(nl) && !nl.trim().startsWith('[')) { section.items.push({ type: 'pair', chords: l, lyrics: nl }); } else { section.items.push({ type: 'chords', chords: l }); } } else { if (i === 0 || !isPotentiallyChordLine(lines[i - 1])) { section.items.push({ type: 'lyrics', lyrics: l }); } } }); return structure.filter(s => s.items.length > 0 || s.chordSequence.length > 0); }
+    function parseSong(text) { const lines = text.split('\n'), structure = []; let section = null; const create = n => ({ name: n, items: [], chordSequence: [] }); lines.forEach((l, i) => { const t = l.trim(); if (t.startsWith('[') && t.endsWith(']')) { section = create(t.substring(1, t.length - 1)); structure.push(section); return; } if (!section) { section = create('Introdução/Início'); structure.push(section); } if (t === "") { if (section.items.length > 0) section.items.push({ type: 'spacer' }); return; } if (isPotentiallyChordLine(l)) { const chords = l.match(CHORD_REGEX_GLOBAL) || []; section.chordSequence.push(...chords); const nl = lines[i + 1] || ''; if (nl.trim() && !isPotentiallyChordLine(nl) && !nl.trim().startsWith('[')) { section.items.push({ type: 'pair', chords: l, lyrics: nl }); } else { section.items.push({ type: 'chords', chords: l }); } } else { if (i === 0 || !isPotentiallyChordLine(lines[i - 1])) { section.items.push({ type: 'lyrics', lyrics: l }); } } }); return structure.filter(s => s.items.length > 0 || s.chordSequence.length > 0); }
     
     // --- API & DATABASE FUNCTIONS ---
     async function fetchApi(path, options = {}) {
-        const url = path; 
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                if (response.status === 401) { // Unauthorized
-                    showLoginScreen();
-                    return null; // Stop further processing
-                }
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-            }
-            if (response.status === 204 || (options.method && options.method.toUpperCase() === 'DELETE')) {
-                return {}; 
-            }
-            return await response.json();
-        } catch (error) {
-            console.error(`API Error on ${path}:`, error);
-            throw error;
-        }
+        const defaultOptions = { headers: { 'Content-Type': 'application/json' }, credentials: 'include' };
+        const mergedOptions = { ...defaultOptions, ...options };
+        if(options.body && typeof options.body !== 'string') mergedOptions.body = JSON.stringify(options.body);
+        try { const response = await fetch(path, mergedOptions); if (!response.ok) { if (response.status === 401) { showLoginScreen(); return null; } const errorData = await response.json().catch(() => ({error: "Erro desconhecido"})); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } if (response.status === 204 || (options.method && options.method.toUpperCase() === 'DELETE')) { return {}; } return await response.json(); } catch (error) { console.error(`API Error on ${path}:`, error); throw error; }
     }
-    
-    // Auth functions
-    async function checkAuthStatus() {
-        try {
-            const data = await fetchApi('/api/check_auth');
-            if (data && data.is_logged_in) {
-                showApp(data.user.username);
-            } else {
-                showLoginScreen();
-            }
-        } catch (e) {
-            showLoginScreen();
-        }
-    }
-
-    async function handleLogin(event) {
-        event.preventDefault();
-        loginError.classList.add('hidden');
-        const username = event.target.username.value;
-        const password = event.target.password.value;
-        try {
-            const data = await fetchApi('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            if (data) {
-                showApp(data.user.username);
-            } else {
-                loginError.classList.remove('hidden');
-            }
-        } catch (e) {
-            loginError.classList.remove('hidden');
-        }
-    }
-
-    async function handleLogout() {
-        await fetchApi('/api/logout', { method: 'POST' });
-        showLoginScreen();
-    }
-    
-    // Other API functions
-    async function loadSavedSongs() { /* ... unchanged ... */ }
-    async function handleLoadSong(songId) { /* ... unchanged ... */ }
-    async function handleDeleteSong(songId, songTitle) { /* ... unchanged ... */ }
-    async function handleSaveSong(event) { /* ... unchanged ... */ }
+    async function checkAuthStatus() { try { const data = await fetchApi('/api/check_auth'); if (data && data.is_logged_in) { showApp(data.user); } else { showLoginScreen(); } } catch (e) { showLoginScreen(); } }
+    async function handleLogin(event) { event.preventDefault(); dom.loginError.classList.add('hidden'); const username = dom.loginForm.username.value; const password = dom.loginForm.password.value; try { const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); if (data) { showApp(data.user); } } catch (e) { dom.loginError.textContent = e.message; dom.loginError.classList.remove('hidden'); } }
+    async function handleLogout() { try { await fetchApi('/api/logout', { method: 'POST' }); showLoginScreen(); } catch(e) { console.error("Logout failed, forcing UI change"); showLoginScreen(); } }
+    async function loadSavedSongs(filter = 'my_songs') { try { const songs = await fetchApi(`/api/songs?filter=${filter}`); dom.modalSongsList.innerHTML = ''; if (!songs || songs.length === 0) { dom.modalSongsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhuma música ${filter === 'public' ? 'pública' : 'sua'} encontrada.</p>`; return; } songs.forEach(song => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2 hover:bg-blue-100 rounded cursor-pointer'; li.innerHTML = `<div class="flex-1 truncate"><span class="text-sm font-medium">${song.title}</span><span class="text-xs text-gray-500 ml-2">(${song.original_key || 'N/A'})</span></div><div class="flex gap-2"><button data-id="${song.id}" data-userid="${song.user_id}" class="delete-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button></div>`; li.querySelector('.flex-1').addEventListener('click', () => { handleLoadSong(song.id); dom.songsModal.close(); }); li.querySelector('.delete-btn').addEventListener('click', (e) => { e.stopPropagation(); handleDeleteSong(song.id, song.title); }); dom.modalSongsList.appendChild(li); }); } catch (error) { dom.modalSongsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar músicas.</p>'; } }
+    async function handleLoadSong(songId) { try { const song = await fetchApi(`/api/songs/${songId}`); dom.songInput.value = song.content; handleGenerate(); } catch (error) { alert('Não foi possível carregar a música.'); } }
+    async function handleDeleteSong(songId, songTitle) { if (confirm(`Tem certeza que deseja deletar "${songTitle}"?`)) { try { await fetchApi(`/api/songs/${songId}`, { method: 'DELETE' }); loadSavedSongs(dom.mySongsTab.classList.contains('active') ? 'my_songs' : 'public'); } catch (error) { alert(error.message); } } }
+    async function handleSaveSong(event) { event.preventDefault(); const title = dom.songTitleInput.value; const content = dom.songInput.value; const original_key = dom.originalKeyInput.value; const is_public = dom.isPublicCheckbox.checked; if (!title || !content.trim()) { alert('Título e conteúdo da cifra são obrigatórios.'); return; } try { await fetchApi('/api/songs', { method: 'POST', body: { title, content, original_key, is_public } }); dom.saveModal.close(); dom.saveForm.reset(); } catch (error) { alert('Não foi possível salvar a música.'); } }
+    async function handleCreateUser(event) { event.preventDefault(); dom.createUserFeedback.classList.add('hidden'); const username = dom.createUserForm['new-username'].value; const password = dom.createUserForm['new-password'].value; try { const data = await fetchApi('/api/users', { method: 'POST', body: { username, password } }); dom.createUserFeedback.textContent = data.message; dom.createUserFeedback.className = 'text-sm mt-4 text-green-600'; dom.createUserForm.reset(); setTimeout(() => dom.createUserModal.close(), 1500); handleOpenUserManagement(); } catch (error) { dom.createUserFeedback.textContent = error.message; dom.createUserFeedback.className = 'text-sm mt-4 text-red-600'; } finally { dom.createUserFeedback.classList.remove('hidden'); } }
+    async function handleOpenUserManagement() { try { const users = await fetchApi('/api/users'); dom.modalUsersList.innerHTML = ''; if (!users || users.length === 0) return; users.forEach(user => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2'; li.innerHTML = `<span class="text-sm">${user.username}</span>`; if (user.username !== 'admin') { li.innerHTML += `<button data-id="${user.id}" data-username="${user.username}" class="delete-user-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button>`; } dom.modalUsersList.appendChild(li); }); dom.userManagementModal.showModal(); } catch (error) { alert("Não foi possível carregar a lista de usuários."); } }
+    async function handleDeleteUserFromModal(e) { if (!e.target.closest('.delete-user-btn')) return; const btn = e.target.closest('.delete-user-btn'); const userId = btn.dataset.id; const username = btn.dataset.username; if (confirm(`Tem certeza que deseja deletar o usuário "${username}"?`)) { try { await fetchApi(`/api/users/${userId}`, { method: 'DELETE' }); handleOpenUserManagement(); } catch (error) { alert('Não foi possível deletar o usuário.'); } } }
+    async function handleChangePassword(e) { e.preventDefault(); dom.changePasswordFeedback.classList.add('hidden'); const old_password = dom.changePasswordForm['old-password'].value; const new_password = dom.changePasswordForm['new-password'].value; try { const data = await fetchApi('/api/users/change_password', { method: 'POST', body: { old_password, new_password } }); dom.changePasswordFeedback.textContent = data.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-green-600'; dom.changePasswordForm.reset(); setTimeout(() => dom.changePasswordModal.close(), 1500); } catch (error) { dom.changePasswordFeedback.textContent = error.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-red-600'; } finally { dom.changePasswordFeedback.classList.remove('hidden'); } }
+    async function handleOpenSetlistManagement() { /* ... */ }
+    async function handleCreateSetList(event) { /* ... */ }
 
     // --- UI/DISPLAY LOGIC ---
-    function showApp(username) {
-        loginContainer.classList.add('hidden');
-        appContainer.classList.remove('hidden');
-        appContainer.classList.add('flex');
-        welcomeUser.textContent = `Olá, ${username}`;
-        loadSavedSongs();
-        handleGenerate();
-    }
-
-    function showLoginScreen() {
-        loginContainer.classList.remove('hidden');
-        appContainer.classList.add('hidden');
-        appContainer.classList.remove('flex');
-    }
+    function showApp(user) { dom.loginContainer.classList.add('hidden'); dom.appContainer.classList.remove('hidden'); dom.appContainer.classList.add('flex'); dom.welcomeUser.textContent = `Olá, ${user.username}`; dom.manageUsersBtn.classList.toggle('hidden', !user.is_admin); [dom.logoutBtn, dom.fullscreenBtn, dom.changePasswordBtn].forEach(b => b.classList.remove('hidden')); handleGenerate(); }
+    function showLoginScreen() { dom.loginContainer.classList.remove('hidden'); dom.appContainer.classList.add('hidden'); dom.appContainer.classList.remove('flex'); }
 
     // --- RENDERING LOGIC ---
-    function applyStyles() { const e = document.getElementById('dynamic-styles'); if (e) e.remove(); const s = document.createElement("style"); s.id = 'dynamic-styles'; s.innerText = `.lyric-output{font-size:${state.ui.lyricsSize}px;color:${state.ui.lyricsColor};}.chord-output,.summary-chord{font-size:${state.ui.chordsSize}px;color:${state.ui.chordsColor};}`; document.head.appendChild(s); }
-    function render() { if (state.songStructure.length === 0) { outputArea.innerHTML = '<p class="text-gray-500 italic">Gere uma cifra ou carregue uma música salva.</p>'; summaryArea.innerHTML = ''; return; } outputArea.innerHTML = ''; state.songStructure.forEach(s => { const d = document.createElement('div'); d.className = 'mb-6 section-container'; const h = document.createElement('h3'); h.className = 'text-lg font-bold text-gray-800 mb-2'; h.textContent = s.name; d.appendChild(h); s.items.forEach(i => { if (i.type === 'pair') { const c = i.chords.split(/\s+/).filter(Boolean).map(c => transposeChord(c, state.transposeAmount)).join(' '); const cd = document.createElement('div'); cd.className = 'chord-output whitespace-pre-wrap'; cd.textContent = c.padEnd(i.chords.length); const ld = document.createElement('div'); ld.className = 'lyric-output whitespace-pre-wrap'; ld.textContent = i.lyrics; d.appendChild(cd); d.appendChild(ld); } else if (i.type === 'chords') { const c = i.chords.split(/\s+/).filter(Boolean).map(c => transposeChord(c, state.transposeAmount)).join(' '); const cd = document.createElement('div'); cd.className = 'chord-output whitespace-pre-wrap mb-2'; cd.textContent = c; d.appendChild(cd); } else if (i.type === 'lyrics') { const ld = document.createElement('div'); ld.className = 'lyric-output whitespace-pre-wrap'; ld.textContent = i.lyrics; d.appendChild(ld); } else if (i.type === 'spacer') { const sd = document.createElement('div'); sd.className = 'h-4'; d.appendChild(sd); } }); if (state.currentView === 'map') { const b = document.createElement('div'); b.className = 'mt-3 p-2 bg-gray-50 rounded-md text-sm'; const t = formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount); b.innerHTML = `<span class="font-semibold text-gray-600">Sequência:</span> <span class="summary-chord">${t}</span>`; d.appendChild(b); } outputArea.appendChild(d); }); summaryArea.innerHTML = ''; const st = document.createElement('h2'); st.className = 'text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4'; st.textContent = 'Estrutura Completa da Música'; const sc = document.createElement('div'); sc.className = 'p-4 bg-blue-50 rounded-lg text-sm leading-relaxed'; sc.innerHTML = state.songStructure.filter(s => s.chordSequence.length > 0).map(s => `<strong class="text-blue-800">[${s.name}]</strong> <span class="summary-chord">(${formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount)})</span>`).join(' <span class="font-bold text-blue-400">&rarr;</span> '); summaryArea.appendChild(st); summaryArea.appendChild(sc); applyStyles(); }
+    function applyStyles() { const e = document.getElementById('dynamic-styles'); if (e) e.remove(); const s = document.createElement("style"); s.id = 'dynamic-styles'; s.innerText = `.lyric-output{font-size:${dom.lyricsSizeSlider.value}px;color:${dom.lyricsColorPicker.value};}.chord-output,.summary-chord{font-size:${dom.chordsSizeSlider.value}px;color:${dom.chordsColorPicker.value};}`; document.head.appendChild(s); }
+    function render() { applyStyles(); if (state.songStructure.length === 0) { dom.outputArea.innerHTML = '<p class="text-gray-500 italic">Gere uma cifra ou carregue uma música salva.</p>'; dom.summaryArea.innerHTML = ''; dom.uniqueChordsArea.innerHTML = ''; return; } dom.outputArea.innerHTML = ''; state.songStructure.forEach(s => { const d = document.createElement('div'); d.className = 'mb-6 section-container'; const h = document.createElement('h3'); h.className = 'text-lg font-bold text-gray-800 mb-2'; h.textContent = s.name; d.appendChild(h); s.items.forEach(i => { if (i.type === 'pair' || i.type === 'chords') { const cd = document.createElement('div'); cd.className = 'chord-output mb-1'; cd.textContent = i.chords.replace(CHORD_REGEX_GLOBAL, match => transposeChord(match, state.transposeAmount)); d.appendChild(cd); } if (i.type === 'pair') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'lyrics') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'spacer') { const sd = document.createElement('div'); sd.className = 'h-4'; d.appendChild(sd); } }); if (state.currentView === 'map') { const b = document.createElement('div'); b.className = 'mt-3 p-2 bg-gray-50 rounded-md text-sm flex flex-wrap items-baseline gap-x-2'; const titleSpan = document.createElement('span'); titleSpan.className = 'font-semibold text-gray-600'; titleSpan.textContent = 'Sequência:'; const chordSpan = document.createElement('span'); chordSpan.className = 'summary-chord break-words'; chordSpan.textContent = formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount); b.appendChild(titleSpan); b.appendChild(chordSpan); d.appendChild(b); } dom.outputArea.appendChild(d); }); const allChords = [...new Set(state.songStructure.flatMap(s => s.chordSequence))].map(c => transposeChord(c, state.transposeAmount)); dom.uniqueChordsArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Notas da Música</h2><div class="flex flex-wrap gap-2">${allChords.map(c => `<span class="bg-gray-200 text-gray-800 px-3 py-1 rounded-md text-sm font-medium">${c}</span>`).join('')}</div>`; dom.summaryArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Estrutura Completa</h2><div class="p-4 bg-blue-50 rounded-lg text-sm leading-relaxed">${state.songStructure.filter(s => s.chordSequence.length > 0).map(s => `<strong class="text-blue-800">[${s.name}]</strong> <span class="summary-chord">(${formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount)})</span>`).join(' <span class="font-bold text-blue-400">&rarr;</span> ')}</div>`; }
 
     // --- UI EVENT HANDLERS ---
-    function handleGenerate() { state.songStructure = parseSong(songInput.value); state.transposeAmount = 0; updateTransposeStatus(); render(); }
+    function handleGenerate() { state.songStructure = parseSong(dom.songInput.value); state.transposeAmount = 0; updateTransposeStatus(); render(); }
     function handleTranspose(a) { state.transposeAmount += a; updateTransposeStatus(); render(); }
-    function updateTransposeStatus() { transposeStatus.textContent = state.transposeAmount === 0 ? 'Original' : `${state.transposeAmount > 0 ? '+' : ''}${state.transposeAmount}`; }
-    function handleStyleChange(k, v) { state.ui[k] = v; applyStyles(); }
-    function handleViewModeToggle() { state.currentView = state.currentView === 'chart' ? 'map' : 'chart'; viewModeToggle.textContent = state.currentView === 'chart' ? 'Ver Mapa' : 'Ver Cifra'; render(); }
-    function handleColumnsToggle() { state.isTwoColumns = !state.isTwoColumns; outputArea.classList.toggle('two-columns', state.isTwoColumns); columnsToggle.textContent = state.isTwoColumns ? 'Usar 1 Coluna' : 'Usar 2 Colunas'; }
-    function handleDeviceViewToggle(d) { viewWrapper.classList.remove('view-desktop', 'view-tablet', 'view-mobile'); if (d !== 'desktop') { viewWrapper.classList.add(`view-${d}`); } }
-    function toggleFullscreen() { if (!document.fullscreenElement) { appContainer.requestFullscreen().catch(err => alert(`Erro ao entrar em tela cheia: ${err.message}`)); } else { document.exitFullscreen(); } }
+    function updateTransposeStatus() { if (dom.transposeStatus) dom.transposeStatus.textContent = state.transposeAmount === 0 ? 'Original' : `${state.transposeAmount > 0 ? '+' : ''}${state.transposeAmount}`; }
+    function handleViewModeToggle() { state.currentView = state.currentView === 'chart' ? 'map' : 'chart'; if(dom.viewModeToggle) dom.viewModeToggle.textContent = state.currentView === 'chart' ? 'Ver Mapa' : 'Ver Cifra'; render(); }
+    function handleColumnsToggle() { state.isTwoColumns = !state.isTwoColumns; if(dom.outputArea) dom.outputArea.classList.toggle('two-columns', state.isTwoColumns); if(dom.columnsToggle) dom.columnsToggle.textContent = state.isTwoColumns ? 'Usar 1 Coluna' : 'Usar 2 Colunas'; }
+    function handleDeviceViewToggle(d) { if(dom.viewWrapper) { dom.viewWrapper.classList.remove('view-desktop', 'view-tablet', 'view-mobile'); if (d !== 'desktop') { dom.viewWrapper.classList.add(`view-${d}`); } } }
+    function toggleFullscreen() { if (!document.fullscreenElement) { dom.appContainer?.requestFullscreen().catch(err => alert(`Erro ao entrar em tela cheia: ${err.message}`)); } else { document.exitFullscreen(); } }
 
     // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
-        const transposeUpBtn = document.getElementById('transpose-up');
-        const transposeDownBtn = document.getElementById('transpose-down');
-        const lyricsSizeSlider = document.getElementById('lyrics-size');
-        const chordsSizeSlider = document.getElementById('chords-size');
-        const lyricsColorPicker = document.getElementById('lyrics-color');
-        const chordsColorPicker = document.getElementById('chords-color');
-        const viewModeToggle = document.getElementById('view-mode-toggle');
-        const columnsToggle = document.getElementById('columns-toggle');
+        // Capture all DOM elements
+        const allIds = Array.from(document.querySelectorAll('[id]'));
+        allIds.forEach(el => {
+            const camelCaseId = el.id.replace(/-/g, '_');
+            dom[camelCaseId] = el;
+        });
 
-        loginForm.addEventListener('submit', handleLogin);
-        logoutBtn.addEventListener('click', handleLogout);
-
-        generateButton.addEventListener('click', handleGenerate);
-        transposeUpBtn.addEventListener('click', () => handleTranspose(1));
-        transposeDownBtn.addEventListener('click', () => handleTranspose(-1));
-        lyricsSizeSlider.addEventListener('input', (e) => handleStyleChange('lyricsSize', e.target.value));
-        chordsSizeSlider.addEventListener('input', (e) => handleStyleChange('chordsSize', e.target.value));
-        lyricsColorPicker.addEventListener('input', (e) => handleStyleChange('lyricsColor', e.target.value));
-        chordsColorPicker.addEventListener('input', (e) => handleStyleChange('chordsColor', e.target.value));
-        viewModeToggle.addEventListener('click', handleViewModeToggle);
-        columnsToggle.addEventListener('click', handleColumnsToggle);
+        dom.login_form.addEventListener('submit', handleLogin);
+        dom.logout_btn.addEventListener('click', handleLogout);
+        dom.generateButton.addEventListener('click', handleGenerate);
+        dom.clear_input_btn.addEventListener('click', () => { dom.songInput.value = ''; handleGenerate(); });
+        dom.transpose_up.addEventListener('click', () => handleTranspose(1));
+        dom.transpose_down.addEventListener('click', () => handleTranspose(-1));
+        [dom.lyrics_size, dom.chords_size, dom.lyrics_color, dom.chords_color].forEach(el => el.addEventListener('input', render));
+        dom.view_mode_toggle.addEventListener('click', handleViewModeToggle);
+        dom.columns_toggle.addEventListener('click', handleColumnsToggle);
         document.querySelectorAll('.view-toggle-btn').forEach(b => b.addEventListener('click', e => handleDeviceViewToggle(e.currentTarget.dataset.view)));
+        dom.fullscreen_btn.addEventListener('click', toggleFullscreen);
+        document.addEventListener('fullscreenchange', () => dom.appContainer.classList.toggle('fullscreen-view', !!document.fullscreenElement));
+        dom.saveButton.addEventListener('click', () => { if (dom.songInput.value.trim()) { dom.saveModal.showModal(); } else { alert("Por favor, cole uma cifra antes de salvar."); } });
+        document.querySelectorAll('.cancel-btn').forEach(b => b.addEventListener('click', (e) => e.target.closest('dialog').close()));
+        dom.save_form.addEventListener('submit', handleSaveSong);
+        dom.open_songs_btn.addEventListener('click', () => { dom.my_songs_tab.click(); dom.songsModal.showModal(); });
+        dom.my_songs_tab.addEventListener('click', () => { dom.my_songs_tab.classList.add('active'); dom.public_songs_tab.classList.remove('active'); loadSavedSongs('my_songs'); });
+        dom.public_songs_tab.addEventListener('click', () => { dom.public_songs_tab.classList.add('active'); dom.my_songs_tab.classList.remove('active'); loadSavedSongs('public'); });
+        dom.manage_users_btn.addEventListener('click', handleOpenUserManagement);
+        dom.modal_users_list.addEventListener('click', handleDeleteUserFromModal);
+        dom.open_create_user_modal_btn.addEventListener('click', () => { dom.createUserFeedback.classList.add('hidden'); dom.createUserForm.reset(); dom.createUserModal.showModal(); });
+        dom.create_user_form.addEventListener('submit', handleCreateUser);
+        dom.change_password_btn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
+        dom.change_password_form.addEventListener('submit', handleChangePassword);
+        dom.manage_setlists_btn.addEventListener('click', handleOpenSetlistManagement);
         
-        fullscreenBtn.addEventListener('click', toggleFullscreen);
-        document.addEventListener('fullscreenchange', () => appContainer.classList.toggle('fullscreen-view', !!document.fullscreenElement));
-        saveButton.addEventListener('click', () => { if (songInput.value.trim()) { saveModal.showModal(); } else { alert("Por favor, cole uma cifra antes de salvar."); } });
-        cancelSaveBtn.addEventListener('click', () => saveModal.close());
-        saveForm.addEventListener('submit', handleSaveSong);
-        
-        if (songInput.value.trim() === "") {
-            songInput.value = `[Intro]\nG D Em C\nG D Em C\n\n[Verso 1]\nG              D\nVim para adorar-te\nEm             C\nVim para prostrar-me\nG              D           C\nVim para dizer que és meu Deus\n\n[Refrão]\nG           D/F#\nÉs totalmente amável\nEm          C\nTotalmente digno\nG         D/F#         C\nTão maravilhoso para mim`;
-        }
-        
-        checkAuthStatus(); // Check login status when the page loads
+        if (dom.songInput && dom.songInput.value.trim() === "") { dom.songInput.value = `[Intro]\nG D Em C\n\n[Verso 1]\n   G              D\nVim para adorar-te\n   Em             C\nVim para prostrar-me\nG              D           C\nVim para dizer que és meu Deus`; }
+        checkAuthStatus();
     });
     </script>
 </body>
