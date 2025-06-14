@@ -33,7 +33,7 @@
     <div id="login-container" class="flex items-center justify-center min-h-screen bg-gray-100">
         <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
             <h2 class="text-2xl font-bold text-center text-gray-800">Login - ChordChart Pro</h2>
-            <form id="login-form"><div class="space-y-4"><div><label for="username" class="text-sm font-medium text-gray-700">Usuário</label><input id="username" name="username" type="text" required class="w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm"></div><div><label for="password" class="text-sm font-medium text-gray-700">Senha</label><input id="password" name="password" type="password" required class="w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm"></div></div><p id="login-error" class="text-sm text-red-600 mt-2 hidden">Usuário ou senha inválidos.</p><button type="submit" class="w-full px-4 py-2 mt-6 font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700">Entrar</button></form>
+            <form id="login-form"><div class="space-y-4"><div><label for="username-input" class="text-sm font-medium text-gray-700">Usuário</label><input id="username-input" name="username" type="text" required class="w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm"></div><div><label for="password-input" class="text-sm font-medium text-gray-700">Senha</label><input id="password-input" name="password" type="password" required class="w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm"></div></div><p id="login-error" class="text-sm text-red-600 mt-2 hidden">Usuário ou senha inválidos.</p><button type="submit" class="w-full px-4 py-2 mt-6 font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700">Entrar</button></form>
         </div>
     </div>
 
@@ -94,7 +94,7 @@
         try { const response = await fetch(path, mergedOptions); if (!response.ok) { if (response.status === 401) { showLoginScreen(); return null; } const errorData = await response.json().catch(() => ({error: "Erro desconhecido"})); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } if (response.status === 204 || (options.method && options.method.toUpperCase() === 'DELETE')) { return {}; } return await response.json(); } catch (error) { console.error(`API Error on ${path}:`, error); throw error; }
     }
     async function checkAuthStatus() { try { const data = await fetchApi('/api/check_auth'); if (data && data.is_logged_in) { showApp(data.user); } else { showLoginScreen(); } } catch (e) { showLoginScreen(); } }
-    async function handleLogin(event) { event.preventDefault(); dom.loginError.classList.add('hidden'); const username = dom.loginForm.username.value; const password = dom.loginForm.password.value; try { const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); if (data) { showApp(data.user); } } catch (e) { dom.loginError.textContent = e.message; dom.loginError.classList.remove('hidden'); } }
+    async function handleLogin(event) { event.preventDefault(); dom.loginError.classList.add('hidden'); const username = dom.usernameInput.value; const password = dom.passwordInput.value; try { const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); if (data) { showApp(data.user); } } catch (e) { dom.loginError.textContent = e.message; dom.loginError.classList.remove('hidden'); } }
     async function handleLogout() { try { await fetchApi('/api/logout', { method: 'POST' }); showLoginScreen(); } catch(e) { console.error("Logout failed, forcing UI change"); showLoginScreen(); } }
     async function loadSavedSongs(filter = 'my_songs') { try { const songs = await fetchApi(`/api/songs?filter=${filter}`); dom.modalSongsList.innerHTML = ''; if (!songs || songs.length === 0) { dom.modalSongsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhuma música ${filter === 'public' ? 'pública' : 'sua'} encontrada.</p>`; return; } songs.forEach(song => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2 hover:bg-blue-100 rounded cursor-pointer'; li.innerHTML = `<div class="flex-1 truncate"><span class="text-sm font-medium">${song.title}</span><span class="text-xs text-gray-500 ml-2">(${song.original_key || 'N/A'})</span></div><div class="flex gap-2"><button data-id="${song.id}" data-userid="${song.user_id}" class="delete-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button></div>`; li.querySelector('.flex-1').addEventListener('click', () => { handleLoadSong(song.id); dom.songsModal.close(); }); li.querySelector('.delete-btn').addEventListener('click', (e) => { e.stopPropagation(); handleDeleteSong(song.id, song.title); }); dom.modalSongsList.appendChild(li); }); } catch (error) { dom.modalSongsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar músicas.</p>'; } }
     async function handleLoadSong(songId) { try { const song = await fetchApi(`/api/songs/${songId}`); dom.songInput.value = song.content; handleGenerate(); } catch (error) { alert('Não foi possível carregar a música.'); } }
@@ -128,37 +128,37 @@
     document.addEventListener('DOMContentLoaded', () => {
         // Capture all DOM elements
         const allIds = Array.from(document.querySelectorAll('[id]')).reduce((acc, el) => {
-            const camelCaseId = el.id.replace(/-(\w)/g, (match, letter) => letter.toUpperCase());
+            const camelCaseId = el.id.replace(/-/g, '_');
             acc[camelCaseId] = el;
             return acc;
         }, {});
         Object.assign(dom, allIds);
 
-        if (dom.loginForm) dom.loginForm.addEventListener('submit', handleLogin);
-        if (dom.logoutBtn) dom.logoutBtn.addEventListener('click', handleLogout);
-        if (dom.generateButton) dom.generateButton.addEventListener('click', handleGenerate);
-        if (dom.clearInputBtn) dom.clearInputBtn.addEventListener('click', () => { dom.songInput.value = ''; handleGenerate(); });
-        if (dom.transposeUpBtn) dom.transposeUpBtn.addEventListener('click', () => handleTranspose(1));
-        if (dom.transposeDownBtn) dom.transposeDownBtn.addEventListener('click', () => handleTranspose(-1));
+        dom.loginForm.addEventListener('submit', handleLogin);
+        dom.logoutBtn.addEventListener('click', handleLogout);
+        dom.generateButton.addEventListener('click', handleGenerate);
+        dom.clearInputBtn.addEventListener('click', () => { dom.songInput.value = ''; handleGenerate(); });
+        dom.transposeUpBtn.addEventListener('click', () => handleTranspose(1));
+        dom.transposeDownBtn.addEventListener('click', () => handleTranspose(-1));
         [dom.lyricsSizeSlider, dom.chordsSizeSlider, dom.lyricsColorPicker, dom.chordsColorPicker].forEach(el => el?.addEventListener('input', render));
-        if (dom.viewModeToggle) dom.viewModeToggle.addEventListener('click', handleViewModeToggle);
-        if (dom.columnsToggle) dom.columnsToggle.addEventListener('click', handleColumnsToggle);
+        dom.viewModeToggle.addEventListener('click', handleViewModeToggle);
+        dom.columnsToggle.addEventListener('click', handleColumnsToggle);
         document.querySelectorAll('.view-toggle-btn').forEach(b => b.addEventListener('click', e => handleDeviceViewToggle(e.currentTarget.dataset.view)));
-        if (dom.fullscreenBtn) dom.fullscreenBtn.addEventListener('click', toggleFullscreen);
-        if (document) document.addEventListener('fullscreenchange', () => dom.appContainer?.classList.toggle('fullscreen-view', !!document.fullscreenElement));
-        if (dom.saveButton) dom.saveButton.addEventListener('click', () => { if (dom.songInput.value.trim()) { dom.saveModal.showModal(); } else { alert("Por favor, cole uma cifra antes de salvar."); } });
+        dom.fullscreenBtn.addEventListener('click', toggleFullscreen);
+        document.addEventListener('fullscreenchange', () => dom.appContainer?.classList.toggle('fullscreen-view', !!document.fullscreenElement));
+        dom.saveButton.addEventListener('click', () => { if (dom.songInput.value.trim()) { dom.saveModal.showModal(); } else { alert("Por favor, cole uma cifra antes de salvar."); } });
         document.querySelectorAll('.cancel-btn').forEach(b => b.addEventListener('click', (e) => e.target.closest('dialog').close()));
-        if (dom.saveForm) dom.saveForm.addEventListener('submit', handleSaveSong);
-        if (dom.openSongsBtn) dom.openSongsBtn.addEventListener('click', () => { dom.mySongsTab.click(); dom.songsModal.showModal(); });
-        if (dom.mySongsTab) dom.mySongsTab.addEventListener('click', () => { dom.mySongsTab.classList.add('active'); dom.publicSongsTab.classList.remove('active'); loadSavedSongs('my_songs'); });
-        if (dom.publicSongsTab) dom.publicSongsTab.addEventListener('click', () => { dom.publicSongsTab.classList.add('active'); dom.mySongsTab.classList.remove('active'); loadSavedSongs('public'); });
-        if (dom.manageUsersBtn) dom.manageUsersBtn.addEventListener('click', handleOpenUserManagement);
-        if (dom.modalUsersList) dom.modalUsersList.addEventListener('click', handleDeleteUserFromModal);
-        if (dom.openCreateUserModalBtn) dom.openCreateUserModalBtn.addEventListener('click', () => { dom.createUserFeedback.classList.add('hidden'); dom.createUserForm.reset(); dom.createUserModal.showModal(); });
-        if (dom.createUserForm) dom.createUserForm.addEventListener('submit', handleCreateUser);
-        if (dom.changePasswordBtn) dom.changePasswordBtn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
-        if (dom.changePasswordForm) dom.changePasswordForm.addEventListener('submit', handleChangePassword);
-        if (dom.manageSetlistsBtn) dom.manageSetlistsBtn.addEventListener('click', handleOpenSetlistManagement);
+        dom.saveForm.addEventListener('submit', handleSaveSong);
+        dom.openSongsBtn.addEventListener('click', () => { dom.mySongsTab.click(); dom.songsModal.showModal(); });
+        dom.mySongsTab.addEventListener('click', () => { dom.mySongsTab.classList.add('active'); dom.publicSongsTab.classList.remove('active'); loadSavedSongs('my_songs'); });
+        dom.publicSongsTab.addEventListener('click', () => { dom.publicSongsTab.classList.add('active'); dom.mySongsTab.classList.remove('active'); loadSavedSongs('public'); });
+        dom.manageUsersBtn.addEventListener('click', handleOpenUserManagement);
+        dom.modalUsersList.addEventListener('click', handleDeleteUserFromModal);
+        dom.openCreateUserModalBtn.addEventListener('click', () => { dom.createUserFeedback.classList.add('hidden'); dom.createUserForm.reset(); dom.createUserModal.showModal(); });
+        dom.createUserForm.addEventListener('submit', handleCreateUser);
+        dom.changePasswordBtn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
+        dom.changePasswordForm.addEventListener('submit', handleChangePassword);
+        dom.manageSetlistsBtn.addEventListener('click', handleOpenSetlistManagement);
         
         if (dom.songInput && dom.songInput.value.trim() === "") { dom.songInput.value = `[Intro]\nG D Em C\n\n[Verso 1]\n   G              D\nVim para adorar-te\n   Em             C\nVim para prostrar-me\nG              D           C\nVim para dizer que és meu Deus`; }
         checkAuthStatus();
