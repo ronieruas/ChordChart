@@ -94,7 +94,7 @@
         try { const response = await fetch(path, mergedOptions); if (!response.ok) { if (response.status === 401) { showLoginScreen(); return null; } const errorData = await response.json().catch(() => ({error: "Erro desconhecido"})); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } if (response.status === 204 || (options.method && options.method.toUpperCase() === 'DELETE')) { return {}; } return await response.json(); } catch (error) { console.error(`API Error on ${path}:`, error); throw error; }
     }
     async function checkAuthStatus() { try { const data = await fetchApi('/api/check_auth'); if (data && data.is_logged_in) { showApp(data.user); } else { showLoginScreen(); } } catch (e) { showLoginScreen(); } }
-    async function handleLogin(event) { event.preventDefault(); dom.loginError.classList.add('hidden'); const username = dom.usernameInput.value; const password = dom.passwordInput.value; try { const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); if (data) { showApp(data.user); } } catch (e) { dom.loginError.textContent = e.message; dom.loginError.classList.remove('hidden'); } }
+    async function handleLogin(event) { event.preventDefault(); dom.loginError.classList.add('hidden'); const username = dom.username.value; const password = dom.password.value; try { const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); if (data) { showApp(data.user); } } catch (e) { dom.loginError.textContent = e.message; dom.loginError.classList.remove('hidden'); } }
     async function handleLogout() { try { await fetchApi('/api/logout', { method: 'POST' }); showLoginScreen(); } catch(e) { console.error("Logout failed, forcing UI change"); showLoginScreen(); } }
     async function loadSavedSongs(filter = 'my_songs') { try { const songs = await fetchApi(`/api/songs?filter=${filter}`); dom.modalSongsList.innerHTML = ''; if (!songs || songs.length === 0) { dom.modalSongsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhuma música ${filter === 'public' ? 'pública' : 'sua'} encontrada.</p>`; return; } songs.forEach(song => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2 hover:bg-blue-100 rounded cursor-pointer'; li.innerHTML = `<div class="flex-1 truncate"><span class="text-sm font-medium">${song.title}</span><span class="text-xs text-gray-500 ml-2">(${song.original_key || 'N/A'})</span></div><div class="flex gap-2"><button data-id="${song.id}" data-userid="${song.user_id}" class="delete-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button></div>`; li.querySelector('.flex-1').addEventListener('click', () => { handleLoadSong(song.id); dom.songsModal.close(); }); li.querySelector('.delete-btn').addEventListener('click', (e) => { e.stopPropagation(); handleDeleteSong(song.id, song.title); }); dom.modalSongsList.appendChild(li); }); } catch (error) { dom.modalSongsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar músicas.</p>'; } }
     async function handleLoadSong(songId) { try { const song = await fetchApi(`/api/songs/${songId}`); dom.songInput.value = song.content; handleGenerate(); } catch (error) { alert('Não foi possível carregar a música.'); } }
@@ -127,38 +127,37 @@
     // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
         // Capture all DOM elements
-        const allIds = Array.from(document.querySelectorAll('[id]')).reduce((acc, el) => {
+        const allIds = Array.from(document.querySelectorAll('[id]'));
+        allIds.forEach(el => {
             const camelCaseId = el.id.replace(/-/g, '_');
-            acc[camelCaseId] = el;
-            return acc;
-        }, {});
-        Object.assign(dom, allIds);
+            dom[camelCaseId] = el;
+        });
 
-        dom.loginForm.addEventListener('submit', handleLogin);
-        dom.logoutBtn.addEventListener('click', handleLogout);
+        dom.login_form.addEventListener('submit', handleLogin);
+        dom.logout_btn.addEventListener('click', handleLogout);
         dom.generateButton.addEventListener('click', handleGenerate);
-        dom.clearInputBtn.addEventListener('click', () => { dom.songInput.value = ''; handleGenerate(); });
-        dom.transposeUpBtn.addEventListener('click', () => handleTranspose(1));
-        dom.transposeDownBtn.addEventListener('click', () => handleTranspose(-1));
-        [dom.lyricsSizeSlider, dom.chordsSizeSlider, dom.lyricsColorPicker, dom.chordsColorPicker].forEach(el => el?.addEventListener('input', render));
-        dom.viewModeToggle.addEventListener('click', handleViewModeToggle);
-        dom.columnsToggle.addEventListener('click', handleColumnsToggle);
+        dom.clear_input_btn.addEventListener('click', () => { dom.songInput.value = ''; handleGenerate(); });
+        dom.transpose_up.addEventListener('click', () => handleTranspose(1));
+        dom.transpose_down.addEventListener('click', () => handleTranspose(-1));
+        [dom.lyrics_size, dom.chords_size, dom.lyrics_color, dom.chords_color].forEach(el => el.addEventListener('input', render));
+        dom.view_mode_toggle.addEventListener('click', handleViewModeToggle);
+        dom.columns_toggle.addEventListener('click', handleColumnsToggle);
         document.querySelectorAll('.view-toggle-btn').forEach(b => b.addEventListener('click', e => handleDeviceViewToggle(e.currentTarget.dataset.view)));
-        dom.fullscreenBtn.addEventListener('click', toggleFullscreen);
-        document.addEventListener('fullscreenchange', () => dom.appContainer?.classList.toggle('fullscreen-view', !!document.fullscreenElement));
+        dom.fullscreen_btn.addEventListener('click', toggleFullscreen);
+        document.addEventListener('fullscreenchange', () => dom.appContainer.classList.toggle('fullscreen-view', !!document.fullscreenElement));
         dom.saveButton.addEventListener('click', () => { if (dom.songInput.value.trim()) { dom.saveModal.showModal(); } else { alert("Por favor, cole uma cifra antes de salvar."); } });
         document.querySelectorAll('.cancel-btn').forEach(b => b.addEventListener('click', (e) => e.target.closest('dialog').close()));
-        dom.saveForm.addEventListener('submit', handleSaveSong);
-        dom.openSongsBtn.addEventListener('click', () => { dom.mySongsTab.click(); dom.songsModal.showModal(); });
-        dom.mySongsTab.addEventListener('click', () => { dom.mySongsTab.classList.add('active'); dom.publicSongsTab.classList.remove('active'); loadSavedSongs('my_songs'); });
-        dom.publicSongsTab.addEventListener('click', () => { dom.publicSongsTab.classList.add('active'); dom.mySongsTab.classList.remove('active'); loadSavedSongs('public'); });
-        dom.manageUsersBtn.addEventListener('click', handleOpenUserManagement);
-        dom.modalUsersList.addEventListener('click', handleDeleteUserFromModal);
-        dom.openCreateUserModalBtn.addEventListener('click', () => { dom.createUserFeedback.classList.add('hidden'); dom.createUserForm.reset(); dom.createUserModal.showModal(); });
-        dom.createUserForm.addEventListener('submit', handleCreateUser);
-        dom.changePasswordBtn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
-        dom.changePasswordForm.addEventListener('submit', handleChangePassword);
-        dom.manageSetlistsBtn.addEventListener('click', handleOpenSetlistManagement);
+        dom.save_form.addEventListener('submit', handleSaveSong);
+        dom.open_songs_btn.addEventListener('click', () => { dom.my_songs_tab.click(); dom.songsModal.showModal(); });
+        dom.my_songs_tab.addEventListener('click', () => { dom.my_songs_tab.classList.add('active'); dom.public_songs_tab.classList.remove('active'); loadSavedSongs('my_songs'); });
+        dom.public_songs_tab.addEventListener('click', () => { dom.public_songs_tab.classList.add('active'); dom.my_songs_tab.classList.remove('active'); loadSavedSongs('public'); });
+        dom.manage_users_btn.addEventListener('click', handleOpenUserManagement);
+        dom.modal_users_list.addEventListener('click', handleDeleteUserFromModal);
+        dom.open_create_user_modal_btn.addEventListener('click', () => { dom.createUserFeedback.classList.add('hidden'); dom.createUserForm.reset(); dom.createUserModal.showModal(); });
+        dom.create_user_form.addEventListener('submit', handleCreateUser);
+        dom.change_password_btn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
+        dom.change_password_form.addEventListener('submit', handleChangePassword);
+        dom.manage_setlists_btn.addEventListener('click', handleOpenSetlistManagement);
         
         if (dom.songInput && dom.songInput.value.trim() === "") { dom.songInput.value = `[Intro]\nG D Em C\n\n[Verso 1]\n   G              D\nVim para adorar-te\n   Em             C\nVim para prostrar-me\nG              D           C\nVim para dizer que és meu Deus`; }
         checkAuthStatus();
