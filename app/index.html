@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .chord-output, .lyric-output, .summary-chord { font-family: 'Roboto Mono', monospace; line-height: 1.6; white-space: pre; }
@@ -21,6 +22,9 @@
         .fullscreen-view { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: white; overflow-y: auto; z-index: 9999; padding: 2rem; }
         dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
         .hidden { display: none; }
+        .sortable-ghost { opacity: 0.4; background-color: #c7d2fe; }
+        .handle { cursor: move; }
+        @media print { .no-print { display: none !important; } body { background-color: white !important; margin: 0; padding: 0; } main { padding: 0 !important; } #view-wrapper { width: 100% !important; border: none !important; box-shadow: none !important; padding: 1cm !important; } #outputArea { padding: 0 !important; box-shadow: none !important; border: none !important; } .output-container.two-columns { column-count: 2 !important; } h2, h3 { color: black !important; } .chord-output, .summary-chord { color: #1e40af !important; } .lyric-output { color: #111827 !important; } }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -67,6 +71,47 @@
     <dialog id="user-management-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-lg"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Gerenciar Usuários</h3><button id="open-create-user-modal-btn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">Criar Novo</button></div><div id="modal-users-list" class="bg-gray-50 p-2 rounded-md h-80 overflow-y-auto border"></div><div class="flex justify-end mt-4"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Fechar</button></div></dialog>
     <dialog id="change-password-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Alterar Senha</h3><form id="change-password-form"><div class="space-y-4"><div><label for="old-password" class="block text-sm mb-1">Senha Antiga:</label><div class="relative"><input type="password" id="old-password" class="w-full p-2 border rounded-md" required><button type="button" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-600 toggle-password-btn"><i class="fas fa-eye"></i></button></div></div><div><label for="new-password" class="block text-sm mb-1">Nova Senha:</label><div class="relative"><input type="password" id="new-password" class="w-full p-2 border rounded-md" required><button type="button" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-600 toggle-password-btn"><i class="fas fa-eye"></i></button></div></div></div><p id="change-password-feedback" class="text-sm mt-4 hidden"></p><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Alterar Senha</button></div></form></dialog>
     <dialog id="create-user-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Criar Novo Usuário</h3><form id="create-user-form"><div class="space-y-4"><div><label for="new-username" class="block text-sm mb-1">Nome de Usuário:</label><input type="text" id="new-username" class="w-full p-2 border rounded-md" required></div><div><label for="create-user-password" class="block text-sm mb-1">Senha:</label><div class="relative"><input type="password" id="create-user-password" class="w-full p-2 border rounded-md" required><button type="button" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-600 toggle-password-btn"><i class="fas fa-eye"></i></button></div></div></div><p id="create-user-feedback" class="text-sm mt-4 hidden"></p><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Criar Usuário</button></div></form></dialog>
+    <dialog id="setlists-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-xl">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="setlists-modal-title" class="text-lg font-bold">Gerenciar Setlists</h3>
+            <button class="cancel-btn text-2xl font-light">&times;</button>
+        </div>
+        <div id="setlists-view-container">
+            <nav id="setlists-tabs-nav" class="-mb-px flex gap-4 border-b border-gray-200" aria-label="Tabs">
+                <button id="my-setlists-tab" class="tab-btn active whitespace-nowrap border-b-2 py-2 px-1 text-sm font-medium">Meus Setlists</button>
+                <button id="public-setlists-tab" class="tab-btn whitespace-nowrap border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Setlists Públicos</button>
+            </nav>
+        </div>
+        <div id="modal-setlists-list" class="bg-gray-50 p-2 rounded-md h-80 overflow-y-auto border-x border-b mb-4"></div>
+        <form id="create-setlist-form" class="p-4 border-t">
+            <h4 class="font-semibold mb-2">Criar Novo Setlist</h4>
+            <div class="flex items-end gap-3">
+                <div class="flex-grow">
+                    <label for="setlist-name-input" class="block text-sm mb-1">Nome do Setlist:</label>
+                    <input type="text" id="setlist-name-input" class="w-full p-2 border rounded-md" required>
+                </div>
+                <div class="flex items-center pb-2">
+                    <input id="setlist-is-public-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <label for="setlist-is-public-checkbox" class="ml-2 block text-sm text-gray-900">Público</label>
+                </div>
+                <button type="submit" class="py-2 px-4 bg-indigo-600 text-white rounded-md h-fit">Criar</button>
+            </div>
+            <p id="create-setlist-feedback" class="text-sm mt-2 hidden"></p>
+        </form>
+    </dialog>
+    <dialog id="add-to-setlist-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-sm">
+        <form id="add-to-setlist-form">
+            <h3 class="text-lg font-bold mb-4">Adicionar Música ao Setlist</h3>
+            <div class="space-y-4">
+                <label for="setlist-select" class="block text-sm mb-1">Escolha o setlist:</label>
+                <select id="setlist-select" class="w-full p-2 border rounded-md"></select>
+            </div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button>
+                <button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Adicionar</button>
+            </div>
+        </form>
+    </dialog>
 
     <script>
     // --- STATE & DOM ---
@@ -75,14 +120,18 @@
         songInput: document.getElementById('songInput'), generateButton: document.getElementById('generateButton'), saveButton: document.getElementById('saveButton'), clearButton: document.getElementById('clearButton'), outputArea: document.getElementById('outputArea'), summaryArea: document.getElementById('summaryArea'), uniqueChordsArea: document.getElementById('uniqueChordsArea'),
         fullscreenBtn: document.getElementById('fullscreen-btn'), appContainer: document.getElementById('app-container'), transposeStatus: document.getElementById('transpose-status'), loginContainer: document.getElementById('login-container'), loginForm: document.getElementById('login-form'), loginError: document.getElementById('login-error'), welcomeUser: document.getElementById('welcome-user'), logoutBtn: document.getElementById('logout-btn'),
         transposeUpBtn: document.getElementById('transpose-up'), transposeDownBtn: document.getElementById('transpose-down'), lyricsSizeSlider: document.getElementById('lyrics-size'), chordsSizeSlider: document.getElementById('chords-size'), lyricsColorPicker: document.getElementById('lyrics-color'), chordsColorPicker: document.getElementById('chords-color'),
-        viewModeToggle: document.getElementById('view-mode-toggle'), columnsToggle: document.getElementById('columns-toggle'), viewWrapper: document.getElementById('view-wrapper'),
+        viewModeToggle: document.getElementById('view-mode-toggle'), columnsToggle: document.getElementById('columns-toggle'), viewWrapper: document.getElementById('view-wrapper'), 
         saveModal: document.getElementById('save-modal'), saveForm: document.getElementById('save-form'), songTitleInput: document.getElementById('song-title-input'), originalKeyInput: document.getElementById('original-key-input'), isPublicCheckbox: document.getElementById('is-public-checkbox'),
-        openSongsBtn: document.getElementById('open-songs-btn'), songsModal: document.getElementById('songs-modal'), modalSongsList: document.getElementById('modal-songs-list'), mySongsTab: document.getElementById('my-songs-tab'), publicSongsTab: document.getElementById('public-songs-tab'),
+        openSongsBtn: document.getElementById('open-songs-btn'), songsModal: document.getElementById('songs-modal'), modalSongsList: document.getElementById('modal-songs-list'), mySongsTab: document.getElementById('my-songs-tab'), publicSongsTab: document.getElementById('public-songs-tab'), 
         manageUsersBtn: document.getElementById('manage-users-btn'), userManagementModal: document.getElementById('user-management-modal'), modalUsersList: document.getElementById('modal-users-list'), openCreateUserModalBtn: document.getElementById('open-create-user-modal-btn'), createUserModal: document.getElementById('create-user-modal'), createUserForm: document.getElementById('create-user-form'), createUserFeedback: document.getElementById('create-user-feedback'), 
         changePasswordBtn: document.getElementById('change-password-btn'), changePasswordModal: document.getElementById('change-password-modal'), changePasswordForm: document.getElementById('change-password-form'), changePasswordFeedback: document.getElementById('change-password-feedback'),
+        openSetlistsBtn: document.getElementById('open-setlists-btn'), setlistsModal: document.getElementById('setlists-modal'), setlistsModalTitle: document.getElementById('setlists-modal-title'), setlistsTabsNav: document.getElementById('setlists-tabs-nav'), modalSetlistsList: document.getElementById('modal-setlists-list'), mySetlistsTab: document.getElementById('my-setlists-tab'), publicSetlistsTab: document.getElementById('public-setlists-tab'), createSetlistForm: document.getElementById('create-setlist-form'), createSetlistFeedback: document.getElementById('create-setlist-feedback'), setlistsViewContainer: document.getElementById('setlists-view-container'),
+        addToSetlistModal: document.getElementById('add-to-setlist-modal'), 
+        addToSetlistForm: document.getElementById('add-to-setlist-form'), 
+        setlistSelect: document.getElementById('setlist-select')
     };
 
-    // --- CORE LOGIC (Processamento da Cifra) ---
+    // --- CORE LOGIC ---
     const SHARP_SCALE = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
     const FLAT_SCALE = ['A', 'Bb', 'B', 'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab'];
     const CHORD_REGEX_SOURCE = `[A-Ga-g]([#b])?(m|min|M|Maj|maj|aug|dim|sus|add|Δ|°|ø)?([1-9][0-5]?)?(\\((#|b)?[1-9][0-3]?((,|,\\s)*(\\s|#|b)?[1-9][0-3]?)*\\))?(sus[24]?)?([/\\\\][A-Ga-g]([#b])?)?`;
@@ -141,6 +190,7 @@
                         <span class="text-xs text-gray-500 ml-2">(${song.original_key || 'N/A'})</span>
                     </div>
                     <div class="flex gap-2">
+                        <button data-song-id="${song.id}" class="add-to-setlist-btn text-blue-500 hover:text-blue-700 p-1" title="Adicionar ao Setlist"><i class="fas fa-plus-circle"></i></button>
                         <button data-id="${song.id}" data-title="${song.title}" class="delete-song-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button>
                     </div>`; 
                 li.querySelector('.flex-1').addEventListener('click', () => { handleLoadSong(song.id); dom.songsModal.close(); }); 
@@ -178,6 +228,171 @@
     async function handleDeleteUserFromModal(e) { if (!e.target.closest('.delete-user-btn')) return; const btn = e.target.closest('.delete-user-btn'); const userId = btn.dataset.id; const username = btn.dataset.username; if (confirm(`Tem certeza que deseja deletar o usuário "${username}"?`)) { try { await fetchApi(`/api/users/${userId}`, { method: 'DELETE' }); handleOpenUserManagement(); } catch (error) { alert('Não foi possível deletar o usuário.'); } } }
     async function handleChangePassword(e) { e.preventDefault(); dom.changePasswordFeedback.classList.add('hidden'); const old_password = dom.changePasswordForm['old-password'].value; const new_password = dom.changePasswordForm['new-password'].value; try { const data = await fetchApi('/api/users/change_password', { method: 'POST', body: { old_password, new_password } }); dom.changePasswordFeedback.textContent = data.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-green-600'; dom.changePasswordForm.reset(); setTimeout(() => dom.changePasswordModal.close(), 1500); } catch (error) { dom.changePasswordFeedback.textContent = error.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-red-600'; } finally { dom.changePasswordFeedback.classList.remove('hidden'); } }
 
+    // --- SETLISTS FUNCTIONS ---
+    async function handleOpenSetlistsModal() {
+        dom.setlistsTabsNav.classList.remove('hidden');
+        dom.createSetlistForm.classList.remove('hidden');
+        dom.setlistsModalTitle.textContent = 'Gerenciar Setlists';
+        dom.mySetlistsTab.classList.add('active');
+        dom.publicSetlistsTab.classList.remove('active');
+        const backButton = dom.setlistsModal.querySelector('.back-to-setlist-list');
+        if (backButton) backButton.remove();
+        
+        await loadSetlists('my_setlists');
+        dom.setlistsModal.showModal();
+    }
+    async function loadSetlists(filter = 'my_setlists') {
+        try {
+            const setlists = await fetchApi(`/api/setlists?filter=${filter}`);
+            dom.modalSetlistsList.innerHTML = '';
+            if (!setlists || setlists.length === 0) {
+                dom.modalSetlistsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhum setlist encontrado.</p>`;
+                return;
+            }
+            setlists.forEach(setlist => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center p-2 hover:bg-indigo-100 rounded';
+                li.innerHTML = `
+                    <div class="flex-1 truncate cursor-pointer view-setlist-btn" data-id="${setlist.id}">
+                        <span class="text-sm font-medium">${setlist.name}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button data-id="${setlist.id}" data-name="${setlist.name}" class="delete-setlist-btn text-red-500 hover:text-red-700 p-1" title="Deletar">
+                            <i class="fas fa-trash-alt fa-xs"></i>
+                        </button>
+                    </div>`;
+                dom.modalSetlistsList.appendChild(li);
+            });
+        } catch (error) {
+            dom.modalSetlistsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar setlists.</p>';
+        }
+    }
+    async function handleCreateSetlist(event) {
+        event.preventDefault();
+        dom.createSetlistFeedback.classList.add('hidden');
+        const form = event.target;
+        const name = form['setlist-name-input'].value;
+        const is_public = form['setlist-is-public-checkbox'].checked;
+        if (!name.trim()) { alert('O nome do setlist não pode estar em branco.'); return; }
+        try {
+            await fetchApi('/api/setlists', { method: 'POST', body: { name, is_public } });
+            form.reset();
+            await loadSetlists(dom.mySetlistsTab.classList.contains('active') ? 'my_setlists' : 'public');
+        } catch (error) {
+            dom.createSetlistFeedback.textContent = `Erro: ${error.message}`;
+            dom.createSetlistFeedback.className = 'text-sm mt-2 text-red-600';
+            dom.createSetlistFeedback.classList.remove('hidden');
+        }
+    }
+    async function viewSetlist(setlistId) {
+        try {
+            const data = await fetchApi(`/api/setlists/${setlistId}`);
+            dom.setlistsTabsNav.classList.add('hidden');
+            dom.createSetlistForm.classList.add('hidden');
+            dom.setlistsModalTitle.textContent = data.name;
+
+            const backButton = document.createElement('button');
+            backButton.innerHTML = '&larr; Voltar para a lista';
+            backButton.className = 'text-sm text-indigo-600 hover:underline mb-4 back-to-setlist-list';
+            backButton.onclick = () => handleOpenSetlistsModal();
+
+            const listContainer = dom.modalSetlistsList;
+            listContainer.innerHTML = '';
+            dom.setlistsViewContainer.after(listContainer); 
+            listContainer.before(backButton);
+
+            if (data.songs && data.songs.length > 0) {
+                data.songs.forEach(song => {
+                    const songLi = document.createElement('li');
+                    songLi.className = 'flex justify-between items-center p-2 border-b';
+                    songLi.dataset.songId = song.id;
+
+                    let liContent = `<div class="flex items-center flex-grow">`;
+                    if (data.is_owner) {
+                        liContent += '<i class="fas fa-grip-vertical text-gray-400 mr-3 handle"></i>';
+                    }
+                    liContent += `<span>${song.title}</span></div>`;
+
+                    if (data.is_owner) {
+                        liContent += `
+                            <button class="remove-song-from-setlist-btn text-red-500 hover:text-red-700 p-1" 
+                                    title="Remover do Setlist" 
+                                    data-song-id="${song.id}" 
+                                    data-setlist-id="${setlistId}">
+                                <i class="fas fa-times-circle"></i>
+                            </button>`;
+                    }
+                    songLi.innerHTML = liContent;
+                    listContainer.appendChild(songLi);
+                });
+            } else {
+                listContainer.innerHTML = '<p class="text-center text-gray-400 text-sm p-4">Este setlist está vazio. Adicione músicas através do modal "Abrir Músicas Salvas".</p>';
+            }
+
+            if (data.is_owner) {
+                new Sortable(listContainer, {
+                    handle: '.handle',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    onEnd: async function (evt) {
+                        const items = Array.from(listContainer.children);
+                        const songIds = items.map(item => item.dataset.songId);
+                        try {
+                            await fetchApi(`/api/setlists/${setlistId}/songs/order`, {
+                                method: 'PUT',
+                                body: { song_ids: songIds }
+                            });
+                        } catch (error) {
+                            alert('Não foi possível salvar a nova ordem.');
+                        }
+                    }
+                });
+            }
+
+        } catch (error) {
+            alert(`Erro ao carregar o setlist: ${error.message}`);
+        }
+    }
+    async function handleOpenAddToSetlistModal(songId) {
+        try {
+            const mySetlists = await fetchApi('/api/setlists?filter=my_setlists');
+            dom.setlistSelect.innerHTML = '';
+            if (mySetlists && mySetlists.length > 0) {
+                mySetlists.forEach(setlist => {
+                    const option = document.createElement('option');
+                    option.value = setlist.id;
+                    option.textContent = setlist.name;
+                    dom.setlistSelect.appendChild(option);
+                });
+                dom.addToSetlistModal.dataset.songId = songId;
+                dom.addToSetlistModal.showModal();
+            } else {
+                alert('Você precisa criar um setlist primeiro!');
+            }
+        } catch (error) {
+            alert('Erro ao carregar seus setlists.');
+        }
+    }
+    async function handleAddToSetlistSubmit(event) {
+        event.preventDefault();
+        const songId = dom.addToSetlistModal.dataset.songId;
+        const setlistId = dom.setlistSelect.value;
+        if (!songId || !setlistId) {
+            alert('Erro: Música ou setlist não selecionado.');
+            return;
+        }
+        try {
+            await fetchApi(`/api/setlists/${setlistId}/songs`, {
+                method: 'POST',
+                body: { song_id: songId }
+            });
+            dom.addToSetlistModal.close();
+            alert('Música adicionada com sucesso!');
+        } catch (error) {
+            alert(`Erro: ${error.message}`);
+        }
+    }
+
     // --- UI/DISPLAY LOGIC ---
     function showApp(user) { 
         console.log("showApp foi chamada com sucesso para o usuário:", user.username);
@@ -197,7 +412,7 @@
         [dom.logoutBtn, dom.fullscreenBtn, dom.changePasswordBtn, dom.manageUsersBtn].forEach(b => { if (b) b.classList.add('hidden'); });
     }
 
-    // --- RENDERING LOGIC (Reintroduzido) ---
+    // --- RENDERING LOGIC ---
     function applyStyles() { const e = document.getElementById('dynamic-styles'); if (e) e.remove(); const s = document.createElement("style"); s.id = 'dynamic-styles'; s.innerText = `.lyric-output{font-size:${dom.lyricsSizeSlider.value}px;color:${dom.lyricsColorPicker.value};}.chord-output,.summary-chord{font-size:${dom.chordsSizeSlider.value}px;color:${dom.chordsColorPicker.value};}`; document.head.appendChild(s); }
     function render() { applyStyles(); if (state.songStructure.length === 0) { dom.outputArea.innerHTML = '<p class="text-gray-500 italic">Gere uma cifra ou carregue uma música salva.</p>'; dom.summaryArea.innerHTML = ''; dom.uniqueChordsArea.innerHTML = ''; return; } dom.outputArea.innerHTML = ''; state.songStructure.forEach(s => { const d = document.createElement('div'); d.className = 'mb-6 section-container'; const h = document.createElement('h3'); h.className = 'text-lg font-bold text-gray-800 mb-2'; h.textContent = s.name; d.appendChild(h); s.items.forEach(i => { if (i.type === 'pair' || i.type === 'chords') { const cd = document.createElement('div'); cd.className = 'chord-output mb-1'; cd.textContent = i.chords.replace(CHORD_REGEX_GLOBAL, match => transposeChord(match, state.transposeAmount)); d.appendChild(cd); } if (i.type === 'pair') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'lyrics') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'spacer') { const sd = document.createElement('div'); sd.className = 'h-4'; d.appendChild(sd); } }); if (state.currentView === 'map') { const b = document.createElement('div'); b.className = 'mt-3 p-2 bg-gray-50 rounded-md text-sm flex flex-wrap items-baseline gap-x-2'; const titleSpan = document.createElement('span'); titleSpan.className = 'font-semibold text-gray-600'; titleSpan.textContent = 'Sequência:'; const chordSpan = document.createElement('span'); chordSpan.className = 'summary-chord break-words'; chordSpan.textContent = formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount); b.appendChild(titleSpan); b.appendChild(chordSpan); d.appendChild(b); } dom.outputArea.appendChild(d); }); const allChords = [...new Set(state.songStructure.flatMap(s => s.chordSequence))].map(c => transposeChord(c, state.transposeAmount)); dom.uniqueChordsArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Notas da Música</h2><div class="flex flex-wrap gap-2">${allChords.map(c => `<span class="bg-gray-200 text-gray-800 px-3 py-1 rounded-md text-sm font-medium">${c}</span>`).join('')}</div>`; dom.summaryArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Estrutura Completa</h2><div class="p-4 bg-blue-50 rounded-lg text-sm leading-relaxed">${state.songStructure.filter(s => s.chordSequence.length > 0).map(s => `<strong class="text-blue-800">[${s.name}]</strong> <span class="summary-chord">(${formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount)})</span>`).join(' <span class="font-bold text-blue-400">&rarr;</span> ')}</div>`; }
 
@@ -207,6 +422,50 @@
         if (deleteSongBtn) {
             event.stopPropagation();
             handleDeleteSong(deleteSongBtn.dataset.id, deleteSongBtn.dataset.title);
+            return;
+        }
+        const addToSetlistBtn = event.target.closest('.add-to-setlist-btn');
+        if (addToSetlistBtn) {
+            event.stopPropagation();
+            handleOpenAddToSetlistModal(addToSetlistBtn.dataset.songId);
+            return;
+        }
+    }
+    async function handleSetlistsListClick(event) {
+        const viewBtn = event.target.closest('.view-setlist-btn');
+        if (viewBtn) {
+            event.stopPropagation();
+            viewSetlist(viewBtn.dataset.id);
+            return;
+        }
+        const deleteBtn = event.target.closest('.delete-setlist-btn');
+        if (deleteBtn) {
+            event.stopPropagation();
+            const setlistId = deleteBtn.dataset.id;
+            const setlistName = deleteBtn.dataset.name;
+            if (confirm(`Tem certeza que deseja deletar o setlist "${setlistName}"?`)) {
+                try {
+                    await fetchApi(`/api/setlists/${setlistId}`, { method: 'DELETE' });
+                    loadSetlists(dom.mySetlistsTab.classList.contains('active') ? 'my_setlists' : 'public');
+                } catch (error) {
+                    alert(`Erro ao deletar o setlist: ${error.message}`);
+                }
+            }
+            return;
+        }
+        const removeSongBtn = event.target.closest('.remove-song-from-setlist-btn');
+        if (removeSongBtn) {
+            event.stopPropagation();
+            const songId = removeSongBtn.dataset.songId;
+            const setlistId = removeSongBtn.dataset.setlistId;
+            if (confirm('Remover esta música do setlist?')) {
+                try {
+                    await fetchApi(`/api/setlists/${setlistId}/songs/${songId}`, { method: 'DELETE' });
+                    viewSetlist(setlistId);
+                } catch (error) {
+                    alert(`Erro ao remover música: ${error.message}`);
+                }
+            }
             return;
         }
     }
@@ -252,6 +511,14 @@
         if(dom.createUserForm) dom.createUserForm.addEventListener('submit', handleCreateUser);
         dom.changePasswordBtn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
         dom.changePasswordForm.addEventListener('submit', handleChangePassword);
+        
+        // Setlists
+        if(dom.openSetlistsBtn) dom.openSetlistsBtn.addEventListener('click', handleOpenSetlistsModal);
+        if(dom.createSetlistForm) dom.createSetlistForm.addEventListener('submit', handleCreateSetlist);
+        if(dom.mySetlistsTab) dom.mySetlistsTab.addEventListener('click', () => { dom.mySetlistsTab.classList.add('active'); dom.publicSetlistsTab.classList.remove('active'); loadSetlists('my_setlists'); });
+        if(dom.publicSetlistsTab) dom.publicSetlistsTab.addEventListener('click', () => { dom.publicSetlistsTab.classList.add('active'); dom.mySetlistsTab.classList.remove('active'); loadSetlists('public'); });
+        if(dom.modalSetlistsList) dom.modalSetlistsList.addEventListener('click', handleSetlistsListClick);
+        if(dom.addToSetlistForm) dom.addToSetlistForm.addEventListener('submit', handleAddToSetlistSubmit);
 
         // Password Visibility Toggle
         document.body.addEventListener('click', function(event) {
