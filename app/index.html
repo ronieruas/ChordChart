@@ -25,6 +25,19 @@
         .sortable-ghost { opacity: 0.4; background-color: #c7d2fe; }
         .handle { cursor: move; }
         @media print { .no-print { display: none !important; } body { background-color: white !important; margin: 0; padding: 0; } main { padding: 0 !important; } #view-wrapper { width: 100% !important; border: none !important; box-shadow: none !important; padding: 1cm !important; } #outputArea { padding: 0 !important; box-shadow: none !important; border: none !important; } .output-container.two-columns { column-count: 2 !important; } h2, h3 { color: black !important; } .chord-output, .summary-chord { color: #1e40af !important; } .lyric-output { color: #111827 !important; } }
+        
+        /* Correção para rolagem em Tela Cheia */
+        .fullscreen-view {
+            display: block; /* Anula o 'flex' para um layout mais simples */
+        }
+        .fullscreen-view aside {
+            display: none; /* Esconde a barra lateral em tela cheia */
+        }
+        .fullscreen-view main {
+            height: 100%; /* Faz a área principal ocupar toda a altura */
+            overflow-y: auto; /* Torna a área principal rolável */
+            padding: 0; /* Remove o padding padrão, pois o pai já tem */
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -315,9 +328,14 @@
                     };
 
                     if (data.is_owner) {
-                        titleContainer.innerHTML += '<i class="fas fa-grip-vertical text-gray-400 mr-3 handle"></i>';
+                        const handleIcon = document.createElement('i');
+                        handleIcon.className = 'fas fa-grip-vertical text-gray-400 mr-3 handle';
+                        titleContainer.appendChild(handleIcon);
                     }
-                    titleContainer.innerHTML += `<span>${song.title}</span>`;
+                    
+                    const titleSpan = document.createElement('span');
+                    titleSpan.textContent = song.title;
+                    titleContainer.appendChild(titleSpan);
                     songLi.appendChild(titleContainer);
 
                     if (data.is_owner) {
