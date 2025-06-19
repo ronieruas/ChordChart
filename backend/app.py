@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import unicodedata
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -140,17 +141,28 @@ def change_password():
 @app.route('/api/songs', methods=['GET'])
 @login_required
 def get_songs_filtered():
-    """Fetches songs based on a filter: 'my_songs' or 'public'."""
+    """Busca músicas com base em um filtro e as ordena corretamente em Python."""
     filter_type = request.args.get('filter', 'my_songs')
     db = get_db()
+    
+    # As consultas SQL agora apenas buscam os dados, sem a cláusula ORDER BY.
     if filter_type == 'public':
-        # ALTERAÇÃO: Adicionado COLLATE NOCASE para ordenação case-insensitive
-        songs = db.execute('SELECT id, title, original_key FROM songs WHERE is_public = 1 ORDER BY title COLLATE NOCASE ASC').fetchall()
-    else: # Default to 'my_songs'
-        # ALTERAÇÃO: Adicionado COLLATE NOCASE para ordenação case-insensitive
-        songs = db.execute('SELECT id, title, original_key FROM songs WHERE user_id = ? ORDER BY title COLLATE NOCASE ASC', (current_user.id,)).fetchall()
+        songs_from_db = db.execute('SELECT id, title, original_key FROM songs WHERE is_public = 1').fetchall()
+    else: # Padrão para 'my_songs'
+        songs_from_db = db.execute('SELECT id, title, original_key FROM songs WHERE user_id = ?', (current_user.id,)).fetchall()
     db.close()
-    return jsonify([dict(song) for song in songs])
+    
+    # Converte o resultado para uma lista de dicionários.
+    songs_list = [dict(song) for song in songs_from_db]
+
+    # Função para normalizar o texto para ordenação (ignora acentos e caixa).
+    def normalize_for_sort(text):
+        return unicodedata.normalize('NFD', text.lower()).encode('ascii', 'ignore').decode('utf-8')
+
+    # Ordena a lista de músicas diretamente no Python.
+    songs_list.sort(key=lambda song: normalize_for_sort(song['title']))
+    
+    return jsonify(songs_list)
 
 @app.route('/api/songs', methods=['POST'])
 @login_required
