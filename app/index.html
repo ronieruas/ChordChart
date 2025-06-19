@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .chord-output, .lyric-output, .summary-chord { font-family: 'Roboto Mono', monospace; line-height: 1.6; white-space: pre; }
@@ -21,6 +22,8 @@
         .fullscreen-view { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: white; overflow-y: auto; z-index: 9999; padding: 2rem; }
         dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
         .hidden { display: none; }
+        .sortable-ghost { opacity: 0.4; background-color: #c7d2fe; }
+        .handle { cursor: move; }
         @media print { .no-print { display: none !important; } body { background-color: white !important; margin: 0; padding: 0; } main { padding: 0 !important; } #view-wrapper { width: 100% !important; border: none !important; box-shadow: none !important; padding: 1cm !important; } #outputArea { padding: 0 !important; box-shadow: none !important; border: none !important; } .output-container.two-columns { column-count: 2 !important; } h2, h3 { color: black !important; } .chord-output, .summary-chord { color: #1e40af !important; } .lyric-output { color: #111827 !important; } }
     </style>
 </head>
@@ -44,7 +47,10 @@
                     <button id="clearButton" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md shadow-sm">Limpar</button>
                 </div>
             </div>
-            <button id="open-songs-btn" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-md shadow-sm mb-4">Abrir Músicas Salvas</button>
+            <div class="flex flex-col gap-2 mb-4">
+                <button id="open-songs-btn" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-md shadow-sm">Abrir Músicas Salvas</button>
+                <button id="open-setlists-btn" class="w-full bg-indigo-700 hover:bg-indigo-800 text-white font-bold py-2 px-4 rounded-md shadow-sm">Gerenciar Setlists</button>
+            </div>
             <div class="space-y-6">
                  <div><h3 class="font-semibold text-gray-800 mb-2">Tom da Música</h3><div class="flex items-center justify-center gap-4 bg-gray-50 p-3 rounded-md"><button id="transpose-down" class="px-3 py-1 bg-gray-300 rounded-md text-lg font-bold">-</button><div class="text-center"><span id="transpose-status" class="font-bold text-lg text-blue-600">Original</span></div><button id="transpose-up" class="px-3 py-1 bg-gray-300 rounded-md text-lg font-bold">+</button></div></div>
                  <div><h3 class="font-semibold text-gray-800 mb-2">Formatação da Cifra</h3><div class="space-y-3 bg-gray-50 p-3 rounded-md"><div class="flex items-center justify-between"><label for="lyrics-size" class="text-sm">Letra:</label><input id="lyrics-size" type="range" min="10" max="32" value="16" class="w-2/3"><input id="lyrics-color" type="color" value="#374151" class="w-8 h-8 p-0 border-none rounded"></div><div class="flex items-center justify-between"><label for="chords-size" class="text-sm">Acordes:</label><input id="chords-size" type="range" min="10" max="32" value="16" class="w-2/3"><input id="chords-color" type="color" value="#2563eb" class="w-8 h-8 p-0 border-none rounded"></div></div></div>
@@ -66,10 +72,61 @@
     <dialog id="change-password-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Alterar Senha</h3><form id="change-password-form"><div class="space-y-4"><label for="old-password" class="block text-sm mb-1">Senha Antiga:</label><input type="password" id="old-password" class="w-full p-2 border rounded-md" required><label for="new-password" class="block text-sm mb-1">Nova Senha:</label><input type="password" id="new-password" class="w-full p-2 border rounded-md" required></div><p id="change-password-feedback" class="text-sm mt-4 hidden"></p><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Alterar Senha</button></div></form></dialog>
     <dialog id="create-user-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Criar Novo Usuário</h3><form id="create-user-form"><div class="space-y-4"><label for="new-username" class="block text-sm mb-1">Nome de Usuário:</label><input type="text" id="new-username" class="w-full p-2 border rounded-md" required><label for="new-password" class="block text-sm mb-1">Senha:</label><input type="password" id="new-password" class="w-full p-2 border rounded-md" required></div><p id="create-user-feedback" class="text-sm mt-4 hidden"></p><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Criar Usuário</button></div></form></dialog>
 
+    <dialog id="setlists-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-xl">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="setlists-modal-title" class="text-lg font-bold">Gerenciar Setlists</h3>
+            <button class="cancel-btn text-2xl font-light">&times;</button>
+        </div>
+        <div id="setlists-view-container">
+            <nav id="setlists-tabs-nav" class="-mb-px flex gap-4 border-b border-gray-200" aria-label="Tabs">
+                <button id="my-setlists-tab" class="tab-btn active whitespace-nowrap border-b-2 py-2 px-1 text-sm font-medium">Meus Setlists</button>
+                <button id="public-setlists-tab" class="tab-btn whitespace-nowrap border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Setlists Públicos</button>
+            </nav>
+            </div>
+        <div id="modal-setlists-list" class="bg-gray-50 p-2 rounded-md h-80 overflow-y-auto border-x border-b mb-4"></div>
+        <form id="create-setlist-form" class="p-4 border-t">
+            <h4 class="font-semibold mb-2">Criar Novo Setlist</h4>
+            <div class="flex items-end gap-3">
+                <div class="flex-grow">
+                    <label for="setlist-name-input" class="block text-sm mb-1">Nome do Setlist:</label>
+                    <input type="text" id="setlist-name-input" class="w-full p-2 border rounded-md" required>
+                </div>
+                <div class="flex items-center pb-2">
+                    <input id="setlist-is-public-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <label for="setlist-is-public-checkbox" class="ml-2 block text-sm text-gray-900">Público</label>
+                </div>
+                <button type="submit" class="py-2 px-4 bg-indigo-600 text-white rounded-md h-fit">Criar</button>
+            </div>
+            <p id="create-setlist-feedback" class="text-sm mt-2 hidden"></p>
+        </form>
+    </dialog>
+
+    <dialog id="add-to-setlist-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-sm">
+        <form id="add-to-setlist-form">
+            <h3 class="text-lg font-bold mb-4">Adicionar Música ao Setlist</h3>
+            <div class="space-y-4">
+                <label for="setlist-select" class="block text-sm mb-1">Escolha o setlist:</label>
+                <select id="setlist-select" class="w-full p-2 border rounded-md"></select>
+            </div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button>
+                <button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Adicionar</button>
+            </div>
+        </form>
+    </dialog>
+
+
     <script>
     // --- STATE MANAGEMENT & DOM ELEMENTS ---
     const state = { songStructure: [], transposeAmount: 0, currentView: 'chart', isTwoColumns: false };
-    const dom = { songInput: document.getElementById('songInput'), generateButton: document.getElementById('generateButton'), saveButton: document.getElementById('saveButton'), clearButton: document.getElementById('clearButton'), outputArea: document.getElementById('outputArea'), summaryArea: document.getElementById('summaryArea'), uniqueChordsArea: document.getElementById('uniqueChordsArea'), saveModal: document.getElementById('save-modal'), saveForm: document.getElementById('save-form'), songTitleInput: document.getElementById('song-title-input'), originalKeyInput: document.getElementById('original-key-input'), isPublicCheckbox: document.getElementById('is-public-checkbox'), fullscreenBtn: document.getElementById('fullscreen-btn'), appContainer: document.getElementById('app-container'), transposeStatus: document.getElementById('transpose-status'), loginContainer: document.getElementById('login-container'), loginForm: document.getElementById('login-form'), loginError: document.getElementById('login-error'), welcomeUser: document.getElementById('welcome-user'), logoutBtn: document.getElementById('logout-btn'), transposeUpBtn: document.getElementById('transpose-up'), transposeDownBtn: document.getElementById('transpose-down'), lyricsSizeSlider: document.getElementById('lyrics-size'), chordsSizeSlider: document.getElementById('chords-size'), lyricsColorPicker: document.getElementById('lyrics-color'), chordsColorPicker: document.getElementById('chords-color'), viewModeToggle: document.getElementById('view-mode-toggle'), columnsToggle: document.getElementById('columns-toggle'), viewWrapper: document.getElementById('view-wrapper'), openSongsBtn: document.getElementById('open-songs-btn'), songsModal: document.getElementById('songs-modal'), modalSongsList: document.getElementById('modal-songs-list'), mySongsTab: document.getElementById('my-songs-tab'), publicSongsTab: document.getElementById('public-songs-tab'), manageUsersBtn: document.getElementById('manage-users-btn'), userManagementModal: document.getElementById('user-management-modal'), modalUsersList: document.getElementById('modal-users-list'), openCreateUserModalBtn: document.getElementById('open-create-user-modal-btn'), createUserModal: document.getElementById('create-user-modal'), createUserForm: document.getElementById('create-user-form'), createUserFeedback: document.getElementById('create-user-feedback'), changePasswordBtn: document.getElementById('change-password-btn'), changePasswordModal: document.getElementById('change-password-modal'), changePasswordForm: document.getElementById('change-password-form'), changePasswordFeedback: document.getElementById('change-password-feedback') };
+    const dom = { 
+        songInput: document.getElementById('songInput'), generateButton: document.getElementById('generateButton'), saveButton: document.getElementById('saveButton'), clearButton: document.getElementById('clearButton'), outputArea: document.getElementById('outputArea'), summaryArea: document.getElementById('summaryArea'), uniqueChordsArea: document.getElementById('uniqueChordsArea'), saveModal: document.getElementById('save-modal'), saveForm: document.getElementById('save-form'), songTitleInput: document.getElementById('song-title-input'), originalKeyInput: document.getElementById('original-key-input'), isPublicCheckbox: document.getElementById('is-public-checkbox'), fullscreenBtn: document.getElementById('fullscreen-btn'), appContainer: document.getElementById('app-container'), transposeStatus: document.getElementById('transpose-status'), loginContainer: document.getElementById('login-container'), loginForm: document.getElementById('login-form'), loginError: document.getElementById('login-error'), welcomeUser: document.getElementById('welcome-user'), logoutBtn: document.getElementById('logout-btn'), transposeUpBtn: document.getElementById('transpose-up'), transposeDownBtn: document.getElementById('transpose-down'), lyricsSizeSlider: document.getElementById('lyrics-size'), chordsSizeSlider: document.getElementById('chords-size'), lyricsColorPicker: document.getElementById('lyrics-color'), chordsColorPicker: document.getElementById('chords-color'), viewModeToggle: document.getElementById('view-mode-toggle'), columnsToggle: document.getElementById('columns-toggle'), viewWrapper: document.getElementById('view-wrapper'), 
+        openSongsBtn: document.getElementById('open-songs-btn'), songsModal: document.getElementById('songs-modal'), modalSongsList: document.getElementById('modal-songs-list'), mySongsTab: document.getElementById('my-songs-tab'), publicSongsTab: document.getElementById('public-songs-tab'), 
+        manageUsersBtn: document.getElementById('manage-users-btn'), userManagementModal: document.getElementById('user-management-modal'), modalUsersList: document.getElementById('modal-users-list'), openCreateUserModalBtn: document.getElementById('open-create-user-modal-btn'), createUserModal: document.getElementById('create-user-modal'), createUserForm: document.getElementById('create-user-form'), createUserFeedback: document.getElementById('create-user-feedback'), 
+        changePasswordBtn: document.getElementById('change-password-btn'), changePasswordModal: document.getElementById('change-password-modal'), changePasswordForm: document.getElementById('change-password-form'), changePasswordFeedback: document.getElementById('change-password-feedback'),
+        openSetlistsBtn: document.getElementById('open-setlists-btn'), setlistsModal: document.getElementById('setlists-modal'), setlistsModalTitle: document.getElementById('setlists-modal-title'), setlistsTabsNav: document.getElementById('setlists-tabs-nav'), modalSetlistsList: document.getElementById('modal-setlists-list'), mySetlistsTab: document.getElementById('my-setlists-tab'), publicSetlistsTab: document.getElementById('public-setlists-tab'), createSetlistForm: document.getElementById('create-setlist-form'), createSetlistFeedback: document.getElementById('create-setlist-feedback'), setlistsViewContainer: document.getElementById('setlists-view-container'),
+        addToSetlistModal: document.getElementById('add-to-setlist-modal'), addToSetlistForm: document.getElementById('add-to-setlist-form'), setlistSelect: document.getElementById('setlist-select')
+    };
 
     // --- CONSTANTS & CORE LOGIC ---
     const SHARP_SCALE = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
@@ -88,34 +145,272 @@
         const defaultOptions = { headers: { 'Content-Type': 'application/json' }, credentials: 'include' };
         const mergedOptions = { ...defaultOptions, ...options };
         if(options.body && typeof options.body !== 'string') mergedOptions.body = JSON.stringify(options.body);
-        try { const response = await fetch(path, mergedOptions); if (!response.ok) { if (response.status === 401) { showLoginScreen(); return null; } const errorData = await response.json().catch(() => ({error: "Erro desconhecido"})); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } if (response.status === 204 || (options.method && options.method.toUpperCase() === 'DELETE')) { return {}; } return await response.json(); } catch (error) { console.error(`API Error on ${path}:`, error); throw error; }
+        try { const response = await fetch(path, mergedOptions); if (!response.ok) { if (response.status === 401) { showLoginScreen(); return null; } const errorData = await response.json().catch(() => ({error: "Erro desconhecido"})); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } if (response.status === 204 || (options.method && options.method.toUpperCase() === 'DELETE') || response.status === 201) { return await response.json().catch(() => ({})); } return await response.json(); } catch (error) { console.error(`API Error on ${path}:`, error); throw error; }
     }
     async function checkAuthStatus() { try { const data = await fetchApi('/api/check_auth'); if (data && data.is_logged_in) { showApp(data.user); } else { showLoginScreen(); } } catch (e) { showLoginScreen(); } }
     async function handleLogin(event) { event.preventDefault(); dom.loginError.classList.add('hidden'); const username = event.target.username.value; const password = event.target.password.value; try { const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); if (data) { showApp(data.user); } } catch (e) { dom.loginError.textContent = e.message; dom.loginError.classList.remove('hidden'); } }
     async function handleLogout() { await fetchApi('/api/logout', { method: 'POST' }); showLoginScreen(); }
-    async function loadSavedSongs(filter = 'my_songs') { try { const songs = await fetchApi(`/api/songs?filter=${filter}`); dom.modalSongsList.innerHTML = ''; if (!songs || songs.length === 0) { dom.modalSongsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhuma música ${filter === 'public' ? 'pública' : 'sua'} encontrada.</p>`; return; } songs.forEach(song => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2 hover:bg-blue-100 rounded cursor-pointer'; li.innerHTML = `<div class="flex-1 truncate"><span class="text-sm font-medium">${song.title}</span><span class="text-xs text-gray-500 ml-2">(${song.original_key || 'N/A'})</span></div><div class="flex gap-2"><button data-id="${song.id}" class="delete-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button></div>`; li.querySelector('.flex-1').addEventListener('click', () => { handleLoadSong(song.id); dom.songsModal.close(); }); li.querySelector('.delete-btn').addEventListener('click', (e) => { e.stopPropagation(); handleDeleteSong(song.id, song.title); }); dom.modalSongsList.appendChild(li); }); } catch (error) { dom.modalSongsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar músicas.</p>'; } }
+    
+    // --- SONGS FUNCTIONS ---
+    async function loadSavedSongs(filter = 'my_songs') { 
+        try { 
+            const songs = await fetchApi(`/api/songs?filter=${filter}`); 
+            dom.modalSongsList.innerHTML = ''; 
+            if (!songs || songs.length === 0) { 
+                dom.modalSongsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhuma música ${filter === 'public' ? 'pública' : 'sua'} encontrada.</p>`; 
+                return; 
+            } 
+            songs.forEach(song => { 
+                const li = document.createElement('li'); 
+                li.className = 'flex justify-between items-center p-2 hover:bg-blue-100 rounded'; 
+                li.innerHTML = `
+                    <div class="flex-1 truncate cursor-pointer">
+                        <span class="text-sm font-medium">${song.title}</span>
+                        <span class="text-xs text-gray-500 ml-2">(${song.original_key || 'N/A'})</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button data-song-id="${song.id}" class="add-to-setlist-btn text-blue-500 hover:text-blue-700 p-1" title="Adicionar ao Setlist"><i class="fas fa-plus-circle"></i></button>
+                        <button data-id="${song.id}" data-title="${song.title}" class="delete-song-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button>
+                    </div>`; 
+                li.querySelector('.flex-1').addEventListener('click', () => { handleLoadSong(song.id); dom.songsModal.close(); }); 
+                dom.modalSongsList.appendChild(li); 
+            }); 
+        } catch (error) { 
+            dom.modalSongsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar músicas.</p>'; 
+        } 
+    }
     async function handleLoadSong(songId) { try { const song = await fetchApi(`/api/songs/${songId}`); dom.songInput.value = song.content; handleGenerate(); } catch (error) { alert('Não foi possível carregar a música.'); } }
     async function handleDeleteSong(songId, songTitle) { if (confirm(`Tem certeza que deseja deletar "${songTitle}"?`)) { try { await fetchApi(`/api/songs/${songId}`, { method: 'DELETE' }); loadSavedSongs(dom.mySongsTab.classList.contains('active') ? 'my_songs' : 'public'); } catch (error) { alert(error.message); } } }
     async function handleSaveSong(event) { event.preventDefault(); const title = dom.songTitleInput.value; const content = dom.songInput.value; const original_key = dom.originalKeyInput.value; const is_public = dom.isPublicCheckbox.checked; if (!title || !content.trim()) { alert('Título e conteúdo da cifra são obrigatórios.'); return; } try { await fetchApi('/api/songs', { method: 'POST', body: { title, content, original_key, is_public } }); dom.saveModal.close(); dom.saveForm.reset(); } catch (error) { alert('Não foi possível salvar a música.'); } }
+    
+    // --- USER MANAGEMENT FUNCTIONS ---
     async function handleCreateUser(event) { event.preventDefault(); dom.createUserFeedback.classList.add('hidden'); const username = dom.createUserForm['new-username'].value; const password = dom.createUserForm['new-password'].value; try { const data = await fetchApi('/api/users', { method: 'POST', body: { username, password } }); dom.createUserFeedback.textContent = data.message; dom.createUserFeedback.className = 'text-sm mt-4 text-green-600'; dom.createUserForm.reset(); setTimeout(() => dom.createUserModal.close(), 1500); handleOpenUserManagement(); } catch (error) { dom.createUserFeedback.textContent = error.message; dom.createUserFeedback.className = 'text-sm mt-4 text-red-600'; } finally { dom.createUserFeedback.classList.remove('hidden'); } }
     async function handleOpenUserManagement() { try { const users = await fetchApi('/api/users'); dom.modalUsersList.innerHTML = ''; if (!users || users.length === 0) return; users.forEach(user => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2'; li.innerHTML = `<span class="text-sm">${user.username}</span>`; if (user.username !== 'admin') { li.innerHTML += `<button data-id="${user.id}" data-username="${user.username}" class="delete-user-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button>`; } dom.modalUsersList.appendChild(li); }); dom.userManagementModal.showModal(); } catch (error) { alert("Não foi possível carregar a lista de usuários."); } }
     async function handleDeleteUserFromModal(e) { if (!e.target.closest('.delete-user-btn')) return; const btn = e.target.closest('.delete-user-btn'); const userId = btn.dataset.id; const username = btn.dataset.username; if (confirm(`Tem certeza que deseja deletar o usuário "${username}"?`)) { try { await fetchApi(`/api/users/${userId}`, { method: 'DELETE' }); handleOpenUserManagement(); } catch (error) { alert('Não foi possível deletar o usuário.'); } } }
     async function handleChangePassword(e) { e.preventDefault(); dom.changePasswordFeedback.classList.add('hidden'); const old_password = dom.changePasswordForm['old-password'].value; const new_password = dom.changePasswordForm['new-password'].value; try { const data = await fetchApi('/api/users/change_password', { method: 'POST', body: { old_password, new_password } }); dom.changePasswordFeedback.textContent = data.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-green-600'; dom.changePasswordForm.reset(); setTimeout(() => dom.changePasswordModal.close(), 1500); } catch (error) { dom.changePasswordFeedback.textContent = error.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-red-600'; } finally { dom.changePasswordFeedback.classList.remove('hidden'); } }
 
-    // --- UI/DISPLAY LOGIC ---
-    function showApp(user) { dom.loginContainer.classList.add('hidden'); dom.appContainer.classList.remove('hidden'); dom.appContainer.classList.add('flex'); dom.welcomeUser.textContent = `Olá, ${user.username}`; [dom.logoutBtn, dom.fullscreenBtn, dom.changePasswordBtn].forEach(b => b.classList.remove('hidden')); dom.manageUsersBtn.classList.toggle('hidden', !user.is_admin); handleGenerate(); }
-    function showLoginScreen() { dom.loginContainer.classList.remove('hidden'); dom.appContainer.classList.add('hidden'); dom.appContainer.classList.remove('flex'); [dom.logoutBtn, dom.fullscreenBtn, dom.changePasswordBtn, dom.manageUsersBtn].forEach(b => b.classList.add('hidden')); }
+    // --- SETLISTS FUNCTIONS ---
+    async function handleOpenSetlistsModal() {
+        dom.setlistsTabsNav.classList.remove('hidden');
+        dom.createSetlistForm.classList.remove('hidden');
+        dom.setlistsModalTitle.textContent = 'Gerenciar Setlists';
+        dom.mySetlistsTab.classList.add('active');
+        dom.publicSetlistsTab.classList.remove('active');
+        // Limpar a lista antiga antes de carregar a nova
+        dom.modalSetlistsList.innerHTML = '';
+        const backButton = dom.setlistsModal.querySelector('.back-to-setlist-list');
+        if (backButton) backButton.remove();
+        
+        await loadSetlists('my_setlists');
+        dom.setlistsModal.showModal();
+    }
+    async function loadSetlists(filter = 'my_setlists') {
+        try {
+            const setlists = await fetchApi(`/api/setlists?filter=${filter}`);
+            dom.modalSetlistsList.innerHTML = '';
+            if (!setlists || setlists.length === 0) {
+                dom.modalSetlistsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhum setlist encontrado.</p>`;
+                return;
+            }
+            setlists.forEach(setlist => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center p-2 hover:bg-indigo-100 rounded';
+                li.innerHTML = `
+                    <div class="flex-1 truncate cursor-pointer view-setlist-btn" data-id="${setlist.id}">
+                        <span class="text-sm font-medium">${setlist.name}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button data-id="${setlist.id}" data-name="${setlist.name}" class="delete-setlist-btn text-red-500 hover:text-red-700 p-1" title="Deletar">
+                            <i class="fas fa-trash-alt fa-xs"></i>
+                        </button>
+                    </div>`;
+                dom.modalSetlistsList.appendChild(li);
+            });
+        } catch (error) {
+            dom.modalSetlistsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar setlists.</p>';
+        }
+    }
+    async function handleCreateSetlist(event) {
+        event.preventDefault();
+        dom.createSetlistFeedback.classList.add('hidden');
+        const form = event.target;
+        const name = form['setlist-name-input'].value;
+        const is_public = form['setlist-is-public-checkbox'].checked;
+        if (!name.trim()) { alert('O nome do setlist não pode estar em branco.'); return; }
+        try {
+            await fetchApi('/api/setlists', { method: 'POST', body: { name, is_public } });
+            form.reset();
+            await loadSetlists(dom.mySetlistsTab.classList.contains('active') ? 'my_setlists' : 'public');
+        } catch (error) {
+            dom.createSetlistFeedback.textContent = `Erro: ${error.message}`;
+            dom.createSetlistFeedback.className = 'text-sm mt-2 text-red-600';
+            dom.createSetlistFeedback.classList.remove('hidden');
+        }
+    }
+    async function viewSetlist(setlistId) {
+        try {
+            const data = await fetchApi(`/api/setlists/${setlistId}`);
+            dom.setlistsTabsNav.classList.add('hidden');
+            dom.createSetlistForm.classList.add('hidden');
+            dom.setlistsModalTitle.textContent = data.name;
 
-    // --- RENDERING LOGIC ---
-    function applyStyles() { const e = document.getElementById('dynamic-styles'); if (e) e.remove(); const s = document.createElement("style"); s.id = 'dynamic-styles'; s.innerText = `.lyric-output{font-size:${dom.lyricsSizeSlider.value}px;color:${dom.lyricsColorPicker.value};}.chord-output,.summary-chord{font-size:${dom.chordsSizeSlider.value}px;color:${dom.chordsColorPicker.value};}`; document.head.appendChild(s); }
-    function render() { applyStyles(); if (state.songStructure.length === 0) { dom.outputArea.innerHTML = '<p class="text-gray-500 italic">Gere uma cifra ou carregue uma música salva.</p>'; dom.summaryArea.innerHTML = ''; dom.uniqueChordsArea.innerHTML = ''; return; } dom.outputArea.innerHTML = ''; state.songStructure.forEach(s => { const d = document.createElement('div'); d.className = 'mb-6 section-container'; const h = document.createElement('h3'); h.className = 'text-lg font-bold text-gray-800 mb-2'; h.textContent = s.name; d.appendChild(h); s.items.forEach(i => { if (i.type === 'pair' || i.type === 'chords') { const cd = document.createElement('div'); cd.className = 'chord-output mb-1'; cd.textContent = i.chords.replace(CHORD_REGEX_GLOBAL, match => transposeChord(match, state.transposeAmount)); d.appendChild(cd); } if (i.type === 'pair') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'lyrics') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'spacer') { const sd = document.createElement('div'); sd.className = 'h-4'; d.appendChild(sd); } }); if (state.currentView === 'map') { const b = document.createElement('div'); b.className = 'mt-3 p-2 bg-gray-50 rounded-md text-sm flex flex-wrap items-baseline gap-x-2'; const titleSpan = document.createElement('span'); titleSpan.className = 'font-semibold text-gray-600'; titleSpan.textContent = 'Sequência:'; const chordSpan = document.createElement('span'); chordSpan.className = 'summary-chord break-words'; chordSpan.textContent = formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount); b.appendChild(titleSpan); b.appendChild(chordSpan); d.appendChild(b); } dom.outputArea.appendChild(d); }); const allChords = [...new Set(state.songStructure.flatMap(s => s.chordSequence))].map(c => transposeChord(c, state.transposeAmount)); dom.uniqueChordsArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Notas da Música</h2><div class="flex flex-wrap gap-2">${allChords.map(c => `<span class="bg-gray-200 text-gray-800 px-3 py-1 rounded-md text-sm font-medium">${c}</span>`).join('')}</div>`; dom.summaryArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Estrutura Completa</h2><div class="p-4 bg-blue-50 rounded-lg text-sm leading-relaxed">${state.songStructure.filter(s => s.chordSequence.length > 0).map(s => `<strong class="text-blue-800">[${s.name}]</strong> <span class="summary-chord">(${formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount)})</span>`).join(' <span class="font-bold text-blue-400">&rarr;</span> ')}</div>`; }
+            const backButton = document.createElement('button');
+            backButton.innerHTML = '&larr; Voltar para a lista';
+            backButton.className = 'text-sm text-indigo-600 hover:underline mb-4 back-to-setlist-list';
+            backButton.onclick = () => handleOpenSetlistsModal();
+
+            const listContainer = dom.modalSetlistsList;
+            listContainer.innerHTML = '';
+            dom.setlistsViewContainer.after(listContainer); 
+            listContainer.before(backButton);
+
+            if (data.songs && data.songs.length > 0) {
+                data.songs.forEach(song => {
+                    const songLi = document.createElement('li');
+                    songLi.className = 'flex justify-between items-center p-2 border-b';
+                    songLi.dataset.songId = song.id;
+
+                    let liContent = `<div class="flex items-center flex-grow">`;
+                    if (data.is_owner) {
+                        liContent += '<i class="fas fa-grip-vertical text-gray-400 mr-3 cursor-move handle"></i>';
+                    }
+                    liContent += `<span>${song.title}</span></div>`;
+
+                    if (data.is_owner) {
+                        liContent += `
+                            <button class="remove-song-from-setlist-btn text-red-500 hover:text-red-700 p-1" 
+                                    title="Remover do Setlist" 
+                                    data-song-id="${song.id}" 
+                                    data-setlist-id="${setlistId}">
+                                <i class="fas fa-times-circle"></i>
+                            </button>`;
+                    }
+                    songLi.innerHTML = liContent;
+                    listContainer.appendChild(songLi);
+                });
+            } else {
+                listContainer.innerHTML = '<p class="text-center text-gray-400 text-sm p-4">Este setlist está vazio. Adicione músicas através do modal "Abrir Músicas Salvas".</p>';
+            }
+
+            if (data.is_owner) {
+                new Sortable(listContainer, {
+                    handle: '.handle',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    onEnd: async function (evt) {
+                        const items = Array.from(listContainer.children);
+                        const songIds = items.map(item => item.dataset.songId);
+                        try {
+                            await fetchApi(`/api/setlists/${setlistId}/songs/order`, {
+                                method: 'PUT',
+                                body: { song_ids: songIds }
+                            });
+                        } catch (error) {
+                            alert('Não foi possível salvar a nova ordem.');
+                        }
+                    }
+                });
+            }
+
+        } catch (error) {
+            alert(`Erro ao carregar o setlist: ${error.message}`);
+        }
+    }
+    async function handleOpenAddToSetlistModal(songId) {
+        try {
+            const mySetlists = await fetchApi('/api/setlists?filter=my_setlists');
+            dom.setlistSelect.innerHTML = '';
+            if (mySetlists && mySetlists.length > 0) {
+                mySetlists.forEach(setlist => {
+                    const option = document.createElement('option');
+                    option.value = setlist.id;
+                    option.textContent = setlist.name;
+                    dom.setlistSelect.appendChild(option);
+                });
+                dom.addToSetlistModal.dataset.songId = songId;
+                dom.addToSetlistModal.showModal();
+            } else {
+                alert('Você precisa criar um setlist primeiro!');
+            }
+        } catch (error) {
+            alert('Erro ao carregar seus setlists.');
+        }
+    }
+    async function handleAddToSetlistSubmit(event) {
+        event.preventDefault();
+        const songId = dom.addToSetlistModal.dataset.songId;
+        const setlistId = dom.setlistSelect.value;
+        if (!songId || !setlistId) {
+            alert('Erro: Música ou setlist não selecionado.');
+            return;
+        }
+        try {
+            await fetchApi(`/api/setlists/${setlistId}/songs`, {
+                method: 'POST',
+                body: { song_id: songId }
+            });
+            dom.addToSetlistModal.close();
+            alert('Música adicionada com sucesso!');
+        } catch (error) {
+            alert(`Erro: ${error.message}`);
+        }
+    }
 
     // --- UI EVENT HANDLERS ---
-    function handleGenerate() { state.songStructure = parseSong(dom.songInput.value); state.transposeAmount = 0; updateTransposeStatus(); render(); }
-    function handleClearInput() {
-        dom.songInput.value = '';
-        handleGenerate(); // Reutiliza a função de gerar para limpar a tela
+    function handleModalListClick(event) {
+        const deleteSongBtn = event.target.closest('.delete-song-btn');
+        if (deleteSongBtn) {
+            event.stopPropagation();
+            handleDeleteSong(deleteSongBtn.dataset.id, deleteSongBtn.dataset.title);
+            return;
+        }
+        const addToSetlistBtn = event.target.closest('.add-to-setlist-btn');
+        if (addToSetlistBtn) {
+            event.stopPropagation();
+            handleOpenAddToSetlistModal(addToSetlistBtn.dataset.songId);
+            return;
+        }
     }
+    async function handleSetlistsListClick(event) {
+        const viewBtn = event.target.closest('.view-setlist-btn');
+        if (viewBtn) {
+            event.stopPropagation();
+            viewSetlist(viewBtn.dataset.id);
+            return;
+        }
+        const deleteBtn = event.target.closest('.delete-setlist-btn');
+        if (deleteBtn) {
+            event.stopPropagation();
+            const setlistId = deleteBtn.dataset.id;
+            const setlistName = deleteBtn.dataset.name;
+            if (confirm(`Tem certeza que deseja deletar o setlist "${setlistName}"?`)) {
+                try {
+                    await fetchApi(`/api/setlists/${setlistId}`, { method: 'DELETE' });
+                    loadSetlists(dom.mySetlistsTab.classList.contains('active') ? 'my_setlists' : 'public');
+                } catch (error) {
+                    alert(`Erro ao deletar o setlist: ${error.message}`);
+                }
+            }
+            return;
+        }
+        const removeSongBtn = event.target.closest('.remove-song-from-setlist-btn');
+        if (removeSongBtn) {
+            event.stopPropagation();
+            const songId = removeSongBtn.dataset.songId;
+            const setlistId = removeSongBtn.dataset.setlistId;
+            if (confirm('Remover esta música do setlist?')) {
+                try {
+                    await fetchApi(`/api/setlists/${setlistId}/songs/${songId}`, { method: 'DELETE' });
+                    viewSetlist(setlistId); // Refresh the view
+                } catch (error) {
+                    alert(`Erro ao remover música: ${error.message}`);
+                }
+            }
+            return;
+        }
+    }
+    function handleGenerate() { state.songStructure = parseSong(dom.songInput.value); state.transposeAmount = 0; updateTransposeStatus(); render(); }
+    function handleClearInput() { dom.songInput.value = ''; handleGenerate(); }
     function handleTranspose(a) { state.transposeAmount += a; updateTransposeStatus(); render(); }
     function updateTransposeStatus() { dom.transposeStatus.textContent = state.transposeAmount === 0 ? 'Original' : `${state.transposeAmount > 0 ? '+' : ''}${state.transposeAmount}`; }
     function handleViewModeToggle() { state.currentView = state.currentView === 'chart' ? 'map' : 'chart'; dom.viewModeToggle.textContent = state.currentView === 'chart' ? 'Ver Mapa' : 'Ver Cifra'; render(); }
@@ -143,12 +438,19 @@
         dom.openSongsBtn.addEventListener('click', () => { dom.mySongsTab.classList.add('active'); dom.publicSongsTab.classList.remove('active'); loadSavedSongs('my_songs'); dom.songsModal.showModal(); });
         dom.mySongsTab.addEventListener('click', () => { dom.mySongsTab.classList.add('active'); dom.publicSongsTab.classList.remove('active'); loadSavedSongs('my_songs'); });
         dom.publicSongsTab.addEventListener('click', () => { dom.publicSongsTab.classList.add('active'); dom.mySongsTab.classList.remove('active'); loadSavedSongs('public'); });
+        dom.modalSongsList.addEventListener('click', handleModalListClick);
         dom.manageUsersBtn.addEventListener('click', handleOpenUserManagement);
         dom.modalUsersList.addEventListener('click', handleDeleteUserFromModal);
         dom.openCreateUserModalBtn.addEventListener('click', () => { dom.createUserFeedback.classList.add('hidden'); dom.createUserForm.reset(); dom.createUserModal.showModal(); });
         dom.createUserForm.addEventListener('submit', handleCreateUser);
         dom.changePasswordBtn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
         dom.changePasswordForm.addEventListener('submit', handleChangePassword);
+        dom.openSetlistsBtn.addEventListener('click', handleOpenSetlistsModal);
+        dom.createSetlistForm.addEventListener('submit', handleCreateSetlist);
+        dom.mySetlistsTab.addEventListener('click', () => { dom.mySetlistsTab.classList.add('active'); dom.publicSetlistsTab.classList.remove('active'); loadSetlists('my_setlists'); });
+        dom.publicSetlistsTab.addEventListener('click', () => { dom.publicSetlistsTab.classList.add('active'); dom.mySetlistsTab.classList.remove('active'); loadSetlists('public'); });
+        dom.modalSetlistsList.addEventListener('click', handleSetlistsListClick);
+        dom.addToSetlistForm.addEventListener('submit', handleAddToSetlistSubmit);
         if (dom.songInput.value.trim() === "") { dom.songInput.value = `[Intro]\nG D Em C\n\n[Verso 1]\n   G              D\nVim para adorar-te\n   Em             C\nVim para prostrar-me\nG              D           C\nVim para dizer que és meu Deus`; }
         checkAuthStatus();
     });

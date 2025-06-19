@@ -38,7 +38,6 @@ def init_db():
         conn = get_db()
         cursor = conn.cursor()
         
-        # Add user_id and is_public to songs table if they don't exist
         cursor.execute("PRAGMA table_info(songs)")
         columns = [column['name'] for column in cursor.fetchall()]
         if 'user_id' not in columns:
@@ -46,7 +45,6 @@ def init_db():
         if 'is_public' not in columns:
             cursor.execute("ALTER TABLE songs ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 0")
 
-        # Create tables if they don't exist
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS songs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
@@ -57,10 +55,31 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL
             )''')
+            
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS setlists (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                user_id INTEGER NOT NULL,
+                is_public BOOLEAN NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            )''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS setlist_songs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                setlist_id INTEGER NOT NULL,
+                song_id INTEGER NOT NULL,
+                position INTEGER NOT NULL,
+                FOREIGN KEY(setlist_id) REFERENCES setlists(id) ON DELETE CASCADE,
+                FOREIGN KEY(song_id) REFERENCES songs(id) ON DELETE CASCADE
+            )''')
+            
         conn.commit()
         conn.close()
 
-# --- AUTH & USER MANAGEMENT ROUTES (Unchanged, but included for completeness) ---
+# --- AUTH & USER MANAGEMENT ROUTES ---
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -137,29 +156,24 @@ def change_password():
     conn.close()
     return jsonify({"message": "Senha alterada com sucesso"})
 
-# --- SONGS API ROUTES (UPDATED) ---
+# --- SONGS API ROUTES ---
 @app.route('/api/songs', methods=['GET'])
 @login_required
 def get_songs_filtered():
-    """Busca músicas com base em um filtro e as ordena corretamente em Python."""
     filter_type = request.args.get('filter', 'my_songs')
     db = get_db()
     
-    # As consultas SQL agora apenas buscam os dados, sem a cláusula ORDER BY.
     if filter_type == 'public':
         songs_from_db = db.execute('SELECT id, title, original_key FROM songs WHERE is_public = 1').fetchall()
-    else: # Padrão para 'my_songs'
+    else:
         songs_from_db = db.execute('SELECT id, title, original_key FROM songs WHERE user_id = ?', (current_user.id,)).fetchall()
     db.close()
     
-    # Converte o resultado para uma lista de dicionários.
     songs_list = [dict(song) for song in songs_from_db]
 
-    # Função para normalizar o texto para ordenação (ignora acentos e caixa).
     def normalize_for_sort(text):
         return unicodedata.normalize('NFD', text.lower()).encode('ascii', 'ignore').decode('utf-8')
 
-    # Ordena a lista de músicas diretamente no Python.
     songs_list.sort(key=lambda song: normalize_for_sort(song['title']))
     
     return jsonify(songs_list)
@@ -178,7 +192,6 @@ def add_song():
 @app.route('/api/songs/<int:song_id>', methods=['DELETE'])
 @login_required
 def delete_song(song_id):
-    """Deletes a song, but only if the current user is the owner."""
     conn = get_db()
     song = conn.execute("SELECT user_id FROM songs WHERE id = ?", (song_id,)).fetchone()
     if song is None:
@@ -193,17 +206,214 @@ def delete_song(song_id):
     conn.close()
     return jsonify({'message': 'Música deletada com sucesso'})
 
-# Get single song remains unchanged
 @app.route('/api/songs/<int:song_id>', methods=['GET'])
 @login_required
 def get_song(song_id):
     db = get_db()
-    # Any logged in user can view any song if they have the ID, for simplicity.
-    # A stricter check could be added here if needed.
     song = db.execute('SELECT content FROM songs WHERE id = ?', (song_id,)).fetchone()
     db.close()
     if song is None: return jsonify({'error': 'Song not found'}), 404
     return jsonify(dict(song))
+
+# --- SETLISTS API ROUTES ---
+@app.route('/api/setlists', methods=['POST'])
+@login_required
+def create_setlist():
+    data = request.get_json()
+    name = data.get('name')
+    is_public = data.get('is_public', False)
+
+    if not name or not name.strip():
+        return jsonify({"error": "O nome do setlist é obrigatório."}), 400
+
+    conn = get_db()
+    cursor = conn.execute(
+        'INSERT INTO setlists (name, user_id, is_public) VALUES (?, ?, ?)',
+        (name, current_user.id, is_public)
+    )
+    conn.commit()
+    new_setlist_id = cursor.lastrowid
+    conn.close()
+
+    return jsonify({"message": "Setlist criado com sucesso!", "setlist": {"id": new_setlist_id, "name": name, "is_public": is_public}}), 201
+
+@app.route('/api/setlists', methods=['GET'])
+@login_required
+def get_setlists():
+    filter_type = request.args.get('filter', 'my_setlists')
+    db = get_db()
+
+    if filter_type == 'public':
+        setlists_from_db = db.execute('SELECT id, name FROM setlists WHERE is_public = 1 ORDER BY name COLLATE NOCASE ASC').fetchall()
+    else: 
+        setlists_from_db = db.execute('SELECT id, name FROM setlists WHERE user_id = ? ORDER BY name COLLATE NOCASE ASC', (current_user.id,)).fetchall()
+    
+    db.close()
+    return jsonify([dict(s) for s in setlists_from_db])
+
+@app.route('/api/setlists/<int:setlist_id>', methods=['GET'])
+@login_required
+def get_setlist_details(setlist_id):
+    db = get_db()
+    
+    setlist = db.execute(
+        'SELECT id, name, user_id, is_public FROM setlists WHERE id = ?',
+        (setlist_id,)
+    ).fetchone()
+
+    if not setlist:
+        db.close()
+        return jsonify({"error": "Setlist não encontrado."}), 404
+
+    is_owner = setlist['user_id'] == current_user.id
+    if not is_owner and not setlist['is_public']:
+        db.close()
+        return jsonify({"error": "Acesso não autorizado."}), 403
+
+    songs_in_setlist = db.execute(
+        '''
+        SELECT s.id, s.title, s.original_key
+        FROM songs s
+        JOIN setlist_songs ss ON s.id = ss.song_id
+        WHERE ss.setlist_id = ?
+        ORDER BY ss.position ASC
+        ''',
+        (setlist_id,)
+    ).fetchall()
+    
+    db.close()
+
+    response_data = {
+        "id": setlist['id'],
+        "name": setlist['name'],
+        "is_public": setlist['is_public'],
+        "is_owner": is_owner,
+        "songs": [dict(song) for song in songs_in_setlist]
+    }
+    
+    return jsonify(response_data)
+
+@app.route('/api/setlists/<int:setlist_id>', methods=['DELETE'])
+@login_required
+def delete_setlist(setlist_id):
+    """Deleta um setlist, mas somente se o usuário for o dono."""
+    conn = get_db()
+    setlist = conn.execute('SELECT user_id FROM setlists WHERE id = ?', (setlist_id,)).fetchone()
+
+    if not setlist:
+        conn.close()
+        return jsonify({"error": "Setlist não encontrado."}), 404
+
+    if setlist['user_id'] != current_user.id:
+        conn.close()
+        return jsonify({"error": "Acesso não autorizado para deletar este setlist."}), 403
+
+    conn.execute('DELETE FROM setlists WHERE id = ?', (setlist_id,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Setlist deletado com sucesso."})
+
+@app.route('/api/setlists/<int:setlist_id>/songs', methods=['POST'])
+@login_required
+def add_song_to_setlist(setlist_id):
+    """Adiciona uma música a um setlist específico."""
+    conn = get_db()
+
+    setlist = conn.execute('SELECT user_id FROM setlists WHERE id = ?', (setlist_id,)).fetchone()
+    if not setlist:
+        conn.close()
+        return jsonify({"error": "Setlist não encontrado."}), 404
+    if setlist['user_id'] != current_user.id:
+        conn.close()
+        return jsonify({"error": "Acesso não autorizado para modificar este setlist."}), 403
+
+    data = request.get_json()
+    song_id = data.get('song_id')
+    if not song_id:
+        conn.close()
+        return jsonify({"error": "ID da música é obrigatório."}), 400
+
+    existing = conn.execute(
+        'SELECT id FROM setlist_songs WHERE setlist_id = ? AND song_id = ?',
+        (setlist_id, song_id)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({"error": "Esta música já está no setlist."}), 409
+
+    max_pos_result = conn.execute('SELECT MAX(position) FROM setlist_songs WHERE setlist_id = ?', (setlist_id,)).fetchone()
+    next_position = (max_pos_result[0] if max_pos_result[0] is not None else -1) + 1
+
+    conn.execute(
+        'INSERT INTO setlist_songs (setlist_id, song_id, position) VALUES (?, ?, ?)',
+        (setlist_id, song_id, next_position)
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Música adicionada ao setlist com sucesso!"}), 201
+
+@app.route('/api/setlists/<int:setlist_id>/songs/<int:song_id>', methods=['DELETE'])
+@login_required
+def remove_song_from_setlist(setlist_id, song_id):
+    """Remove uma música de um setlist específico."""
+    conn = get_db()
+    
+    setlist = conn.execute('SELECT user_id FROM setlists WHERE id = ?', (setlist_id,)).fetchone()
+    if not setlist:
+        conn.close()
+        return jsonify({"error": "Setlist não encontrado."}), 404
+    if setlist['user_id'] != current_user.id:
+        conn.close()
+        return jsonify({"error": "Acesso não autorizado para modificar este setlist."}), 403
+
+    conn.execute(
+        'DELETE FROM setlist_songs WHERE setlist_id = ? AND song_id = ?',
+        (setlist_id, song_id)
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Música removida do setlist com sucesso."})
+
+@app.route('/api/setlists/<int:setlist_id>/songs/order', methods=['PUT'])
+@login_required
+def update_setlist_order(setlist_id):
+    """Atualiza a ordem das músicas em um setlist."""
+    conn = get_db()
+    
+    setlist = conn.execute('SELECT user_id FROM setlists WHERE id = ?', (setlist_id,)).fetchone()
+    if not setlist:
+        conn.close()
+        return jsonify({"error": "Setlist não encontrado."}), 404
+    if setlist['user_id'] != current_user.id:
+        conn.close()
+        return jsonify({"error": "Acesso não autorizado para modificar este setlist."}), 403
+
+    data = request.get_json()
+    song_ids = data.get('song_ids')
+
+    if not isinstance(song_ids, list):
+        conn.close()
+        return jsonify({"error": "Payload inválido: 'song_ids' deve ser uma lista."}), 400
+
+    try:
+        # Usar uma transação para garantir a integridade dos dados
+        for index, song_id in enumerate(song_ids):
+            conn.execute(
+                "UPDATE setlist_songs SET position = ? WHERE setlist_id = ? AND song_id = ?",
+                (index, setlist_id, int(song_id))
+            )
+        conn.commit()
+    except sqlite3.Error as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": f"Erro no banco de dados: {e}"}), 500
+    
+    conn.close()
+    return jsonify({"message": "Ordem do setlist atualizada com sucesso."})
+
 
 init_db()
 
