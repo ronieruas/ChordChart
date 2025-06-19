@@ -64,9 +64,12 @@
 
     <dialog id="save-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Salvar Música</h3><form id="save-form"><div class="space-y-4"><label for="song-title-input" class="block text-sm mb-1">Título da Música:</label><input type="text" id="song-title-input" class="w-full p-2 border rounded-md" required><label for="original-key-input" class="block text-sm mb-1">Tom Original:</label><input type="text" id="original-key-input" class="w-full p-2 border rounded-md" placeholder="Ex: G, Am, C#m"><div class="flex items-center mt-2"><input id="is-public-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><label for="is-public-checkbox" class="ml-2 block text-sm text-gray-900">Compartilhar com todos os usuários</label></div></div><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Salvar</button></div></form></dialog>
     <dialog id="songs-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-lg"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Músicas Salvas</h3><button class="cancel-btn text-2xl font-light">&times;</button></div><div class="border-b border-gray-200 mb-2"><nav class="-mb-px flex gap-4" aria-label="Tabs"><button id="my-songs-tab" class="tab-btn active whitespace-nowrap border-b-2 py-2 px-1 text-sm font-medium">Minhas Músicas</button><button id="public-songs-tab" class="tab-btn whitespace-nowrap border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Todas as Músicas</button></nav></div><div id="modal-songs-list" class="bg-gray-50 p-2 rounded-md h-96 overflow-y-auto border"></div></dialog>
-    
+    <dialog id="user-management-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-lg"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Gerenciar Usuários</h3><button id="open-create-user-modal-btn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">Criar Novo</button></div><div id="modal-users-list" class="bg-gray-50 p-2 rounded-md h-80 overflow-y-auto border"></div><div class="flex justify-end mt-4"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Fechar</button></div></dialog>
+    <dialog id="change-password-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Alterar Senha</h3><form id="change-password-form"><div class="space-y-4"><label for="old-password" class="block text-sm mb-1">Senha Antiga:</label><input type="password" id="old-password" class="w-full p-2 border rounded-md" required><label for="new-password" class="block text-sm mb-1">Nova Senha:</label><input type="password" id="new-password" class="w-full p-2 border rounded-md" required></div><p id="change-password-feedback" class="text-sm mt-4 hidden"></p><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Alterar Senha</button></div></form></dialog>
+    <dialog id="create-user-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Criar Novo Usuário</h3><form id="create-user-form"><div class="space-y-4"><label for="new-username" class="block text-sm mb-1">Nome de Usuário:</label><input type="text" id="new-username" class="w-full p-2 border rounded-md" required><label for="new-password" class="block text-sm mb-1">Senha:</label><input type="password" id="new-password" class="w-full p-2 border rounded-md" required></div><p id="create-user-feedback" class="text-sm mt-4 hidden"></p><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Criar Usuário</button></div></form></dialog>
+
     <script>
-    console.log("Script de recuperação - Passo 2 (Músicas) iniciado.");
+    console.log("Script de recuperação - Passo 3 (Users) iniciado.");
 
     // --- STATE & DOM ---
     const state = { songStructure: [], transposeAmount: 0, currentView: 'chart', isTwoColumns: false };
@@ -75,10 +78,12 @@
         fullscreenBtn: document.getElementById('fullscreen-btn'), appContainer: document.getElementById('app-container'), transposeStatus: document.getElementById('transpose-status'), loginContainer: document.getElementById('login-container'), loginForm: document.getElementById('login-form'), loginError: document.getElementById('login-error'), welcomeUser: document.getElementById('welcome-user'), logoutBtn: document.getElementById('logout-btn'),
         transposeUpBtn: document.getElementById('transpose-up'), transposeDownBtn: document.getElementById('transpose-down'), lyricsSizeSlider: document.getElementById('lyrics-size'), chordsSizeSlider: document.getElementById('chords-size'), lyricsColorPicker: document.getElementById('lyrics-color'), chordsColorPicker: document.getElementById('chords-color'),
         viewModeToggle: document.getElementById('view-mode-toggle'), columnsToggle: document.getElementById('columns-toggle'), viewWrapper: document.getElementById('view-wrapper'),
-        manageUsersBtn: document.getElementById('manage-users-btn'), changePasswordBtn: document.getElementById('change-password-btn'),
-        // DOM para Músicas
+        // Songs
         saveModal: document.getElementById('save-modal'), saveForm: document.getElementById('save-form'), songTitleInput: document.getElementById('song-title-input'), originalKeyInput: document.getElementById('original-key-input'), isPublicCheckbox: document.getElementById('is-public-checkbox'),
         openSongsBtn: document.getElementById('open-songs-btn'), songsModal: document.getElementById('songs-modal'), modalSongsList: document.getElementById('modal-songs-list'), mySongsTab: document.getElementById('my-songs-tab'), publicSongsTab: document.getElementById('public-songs-tab'),
+        // Users
+        manageUsersBtn: document.getElementById('manage-users-btn'), userManagementModal: document.getElementById('user-management-modal'), modalUsersList: document.getElementById('modal-users-list'), openCreateUserModalBtn: document.getElementById('open-create-user-modal-btn'), createUserModal: document.getElementById('create-user-modal'), createUserForm: document.getElementById('create-user-form'), createUserFeedback: document.getElementById('create-user-feedback'), 
+        changePasswordBtn: document.getElementById('change-password-btn'), changePasswordModal: document.getElementById('change-password-modal'), changePasswordForm: document.getElementById('change-password-form'), changePasswordFeedback: document.getElementById('change-password-feedback'),
     };
 
     // --- CORE LOGIC (Processamento da Cifra) ---
@@ -109,7 +114,6 @@
                 const errorData = await response.json().catch(() => ({error: "Erro desconhecido"})); 
                 throw new Error(errorData.error || `HTTP error! status: ${response.status}`); 
             } 
-            // Corrigido para tratar status 201 e 204 que podem não ter corpo JSON
             if (response.status === 204 || (options.method && options.method.toUpperCase() === 'DELETE') || response.status === 201) { 
                 return await response.json().catch(() => ({})); 
             } 
@@ -123,7 +127,7 @@
     async function handleLogin(event) { event.preventDefault(); dom.loginError.classList.add('hidden'); const username = event.target.username.value; const password = event.target.password.value; try { const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); if (data && data.user) { showApp(data.user); } } catch (e) { dom.loginError.textContent = e.message; dom.loginError.classList.remove('hidden'); } }
     async function handleLogout() { try { await fetchApi('/api/logout', { method: 'POST' }); } finally { showLoginScreen(); } }
 
-    // --- SONGS FUNCTIONS (Reintroduzido) ---
+    // --- SONGS FUNCTIONS ---
     async function loadSavedSongs(filter = 'my_songs') { 
         try { 
             const songs = await fetchApi(`/api/songs?filter=${filter}`); 
@@ -153,6 +157,12 @@
     async function handleLoadSong(songId) { try { const song = await fetchApi(`/api/songs/${songId}`); dom.songInput.value = song.content; handleGenerate(); } catch (error) { alert('Não foi possível carregar a música.'); } }
     async function handleDeleteSong(songId, songTitle) { if (confirm(`Tem certeza que deseja deletar "${songTitle}"?`)) { try { await fetchApi(`/api/songs/${songId}`, { method: 'DELETE' }); loadSavedSongs(dom.mySongsTab.classList.contains('active') ? 'my_songs' : 'public'); } catch (error) { alert(error.message); } } }
     async function handleSaveSong(event) { event.preventDefault(); const title = dom.songTitleInput.value; const content = dom.songInput.value; const original_key = dom.originalKeyInput.value; const is_public = dom.isPublicCheckbox.checked; if (!title || !content.trim()) { alert('Título e conteúdo da cifra são obrigatórios.'); return; } try { await fetchApi('/api/songs', { method: 'POST', body: { title, content, original_key, is_public } }); dom.saveModal.close(); dom.saveForm.reset(); } catch (error) { alert('Não foi possível salvar a música.'); } }
+    
+    // --- USER MANAGEMENT FUNCTIONS (Reintroduzido) ---
+    async function handleCreateUser(event) { event.preventDefault(); dom.createUserFeedback.classList.add('hidden'); const username = dom.createUserForm['new-username'].value; const password = dom.createUserForm['new-password'].value; try { const data = await fetchApi('/api/users', { method: 'POST', body: { username, password } }); dom.createUserFeedback.textContent = data.message; dom.createUserFeedback.className = 'text-sm mt-4 text-green-600'; dom.createUserForm.reset(); setTimeout(() => dom.createUserModal.close(), 1500); handleOpenUserManagement(); } catch (error) { dom.createUserFeedback.textContent = error.message; dom.createUserFeedback.className = 'text-sm mt-4 text-red-600'; } finally { dom.createUserFeedback.classList.remove('hidden'); } }
+    async function handleOpenUserManagement() { try { const users = await fetchApi('/api/users'); dom.modalUsersList.innerHTML = ''; if (!users || users.length === 0) return; users.forEach(user => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2'; li.innerHTML = `<span class="text-sm">${user.username}</span>`; if (user.username !== 'admin') { li.innerHTML += `<button data-id="${user.id}" data-username="${user.username}" class="delete-user-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button>`; } dom.modalUsersList.appendChild(li); }); dom.userManagementModal.showModal(); } catch (error) { alert("Não foi possível carregar a lista de usuários."); } }
+    async function handleDeleteUserFromModal(e) { if (!e.target.closest('.delete-user-btn')) return; const btn = e.target.closest('.delete-user-btn'); const userId = btn.dataset.id; const username = btn.dataset.username; if (confirm(`Tem certeza que deseja deletar o usuário "${username}"?`)) { try { await fetchApi(`/api/users/${userId}`, { method: 'DELETE' }); handleOpenUserManagement(); } catch (error) { alert('Não foi possível deletar o usuário.'); } } }
+    async function handleChangePassword(e) { e.preventDefault(); dom.changePasswordFeedback.classList.add('hidden'); const old_password = dom.changePasswordForm['old-password'].value; const new_password = dom.changePasswordForm['new-password'].value; try { const data = await fetchApi('/api/users/change_password', { method: 'POST', body: { old_password, new_password } }); dom.changePasswordFeedback.textContent = data.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-green-600'; dom.changePasswordForm.reset(); setTimeout(() => dom.changePasswordModal.close(), 1500); } catch (error) { dom.changePasswordFeedback.textContent = error.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-red-600'; } finally { dom.changePasswordFeedback.classList.remove('hidden'); } }
 
     // --- UI/DISPLAY LOGIC ---
     function showApp(user) { 
@@ -221,6 +231,17 @@
         dom.mySongsTab.addEventListener('click', () => { dom.mySongsTab.classList.add('active'); dom.publicSongsTab.classList.remove('active'); loadSavedSongs('my_songs'); });
         dom.publicSongsTab.addEventListener('click', () => { dom.publicSongsTab.classList.add('active'); dom.mySongsTab.classList.remove('active'); loadSavedSongs('public'); });
         dom.modalSongsList.addEventListener('click', handleModalListClick);
+
+        // Users (Reintroduzido)
+        dom.manageUsersBtn.addEventListener('click', handleOpenUserManagement);
+        const userList = document.getElementById('modal-users-list');
+        if(userList) userList.addEventListener('click', handleDeleteUserFromModal);
+        const createUserBtn = document.getElementById('open-create-user-modal-btn');
+        if(createUserBtn) createUserBtn.addEventListener('click', () => { dom.createUserFeedback.classList.add('hidden'); dom.createUserForm.reset(); dom.createUserModal.showModal(); });
+        const createUserForm = document.getElementById('create-user-form');
+        if(createUserForm) createUserForm.addEventListener('submit', handleCreateUser);
+        dom.changePasswordBtn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
+        dom.changePasswordForm.addEventListener('submit', handleChangePassword);
 
         // Cifra padrão
         if (dom.songInput.value.trim() === "") { dom.songInput.value = `[Intro]\nG D Em C\n\n[Verso 1]\n   G              D\nVim para adorar-te\n   Em             C\nVim para prostrar-me\nG              D           C\nVim para dizer que és meu Deus`; }
