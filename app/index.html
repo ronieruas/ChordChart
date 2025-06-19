@@ -23,29 +23,11 @@
         .sortable-ghost { opacity: 0.4; background-color: #c7d2fe; }
         .handle { cursor: move; }
 
-        /* Correção Definitiva v3 para Rolagem em Tela Cheia */
-        body:has(#app-container.fullscreen-view) {
-            overflow: hidden;
-        }
-        #app-container.fullscreen-view {
-            /* Mantém o display flex para controlar os filhos! */
-            display: flex;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100vw;
-            height: 100vh;
+        /* NOVA E SIMPLIFICADA ABORDAGEM PARA TELA CHEIA */
+        #view-wrapper:fullscreen {
+            overflow-y: auto !important;
             background-color: white;
-            z-index: 9999;
-            padding: 0; /* O padding vai para o <main> */
-        }
-        #app-container.fullscreen-view > aside {
-            display: none !important; /* Esconde a barra lateral */
-        }
-        #app-container.fullscreen-view > main {
-            flex: 1; /* Garante que o main ocupe todo o espaço */
-            overflow-y: auto !important; /* FORÇA a rolagem NESTE elemento */
-            height: 100%;
-            padding: 2rem; /* Adiciona o padding que removemos do pai */
+            padding: 2rem; /* Adiciona um respiro dentro da tela cheia */
         }
 
         @media print { 
@@ -521,7 +503,7 @@
     function handleViewModeToggle() { state.currentView = state.currentView === 'chart' ? 'map' : 'chart'; dom.viewModeToggle.textContent = state.currentView === 'chart' ? 'Ver Mapa' : 'Ver Cifra'; render(); }
     function handleColumnsToggle() { state.isTwoColumns = !state.isTwoColumns; dom.outputArea.classList.toggle('two-columns', state.isTwoColumns); dom.columnsToggle.textContent = state.isTwoColumns ? 'Usar 1 Coluna' : 'Usar 2 Colunas'; }
     function handleDeviceViewToggle(d) { dom.viewWrapper.classList.remove('view-desktop', 'view-tablet', 'view-mobile'); if (d !== 'desktop') { dom.viewWrapper.classList.add(`view-${d}`); } }
-    function toggleFullscreen() { if (!document.fullscreenElement) { dom.appContainer.requestFullscreen().catch(err => alert(`Erro ao entrar em tela cheia: ${err.message}`)); } else { document.exitFullscreen(); } }
+    function toggleFullscreen() { if (!document.fullscreenElement) { dom.viewWrapper.requestFullscreen().catch(err => alert(`Erro ao entrar em tela cheia: ${err.message}`)); } else { document.exitFullscreen(); } }
 
     // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
