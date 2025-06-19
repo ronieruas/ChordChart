@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .chord-output, .lyric-output, .summary-chord { font-family: 'Roboto Mono', monospace; line-height: 1.6; white-space: pre; }
@@ -21,6 +22,9 @@
         .fullscreen-view { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: white; overflow-y: auto; z-index: 9999; padding: 2rem; }
         dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
         .hidden { display: none; }
+        .sortable-ghost { opacity: 0.4; background-color: #c7d2fe; }
+        .handle { cursor: move; }
+        @media print { .no-print { display: none !important; } body { background-color: white !important; margin: 0; padding: 0; } main { padding: 0 !important; } #view-wrapper { width: 100% !important; border: none !important; box-shadow: none !important; padding: 1cm !important; } #outputArea { padding: 0 !important; box-shadow: none !important; border: none !important; } .output-container.two-columns { column-count: 2 !important; } h2, h3 { color: black !important; } .chord-output, .summary-chord { color: #1e40af !important; } .lyric-output { color: #111827 !important; } }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -67,21 +71,64 @@
     <dialog id="user-management-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-lg"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Gerenciar Usuários</h3><button id="open-create-user-modal-btn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">Criar Novo</button></div><div id="modal-users-list" class="bg-gray-50 p-2 rounded-md h-80 overflow-y-auto border"></div><div class="flex justify-end mt-4"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Fechar</button></div></dialog>
     <dialog id="change-password-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Alterar Senha</h3><form id="change-password-form"><div class="space-y-4"><div><label for="old-password" class="block text-sm mb-1">Senha Antiga:</label><div class="relative"><input type="password" id="old-password" class="w-full p-2 border rounded-md" required><button type="button" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-600 toggle-password-btn"><i class="fas fa-eye"></i></button></div></div><div><label for="new-password" class="block text-sm mb-1">Nova Senha:</label><div class="relative"><input type="password" id="new-password" class="w-full p-2 border rounded-md" required><button type="button" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-600 toggle-password-btn"><i class="fas fa-eye"></i></button></div></div></div><p id="change-password-feedback" class="text-sm mt-4 hidden"></p><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Alterar Senha</button></div></form></dialog>
     <dialog id="create-user-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Criar Novo Usuário</h3><form id="create-user-form"><div class="space-y-4"><div><label for="new-username" class="block text-sm mb-1">Nome de Usuário:</label><input type="text" id="new-username" class="w-full p-2 border rounded-md" required></div><div><label for="create-user-password" class="block text-sm mb-1">Senha:</label><div class="relative"><input type="password" id="create-user-password" class="w-full p-2 border rounded-md" required><button type="button" class="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-600 toggle-password-btn"><i class="fas fa-eye"></i></button></div></div></div><p id="create-user-feedback" class="text-sm mt-4 hidden"></p><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Criar Usuário</button></div></form></dialog>
+    <dialog id="setlists-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-xl">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="setlists-modal-title" class="text-lg font-bold">Gerenciar Setlists</h3>
+            <button class="cancel-btn text-2xl font-light">&times;</button>
+        </div>
+        <div id="setlists-view-container">
+            <nav id="setlists-tabs-nav" class="-mb-px flex gap-4 border-b border-gray-200" aria-label="Tabs">
+                <button id="my-setlists-tab" class="tab-btn active whitespace-nowrap border-b-2 py-2 px-1 text-sm font-medium">Meus Setlists</button>
+                <button id="public-setlists-tab" class="tab-btn whitespace-nowrap border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Setlists Públicos</button>
+            </nav>
+        </div>
+        <div id="modal-setlists-list" class="bg-gray-50 p-2 rounded-md h-80 overflow-y-auto border-x border-b mb-4"></div>
+        <form id="create-setlist-form" class="p-4 border-t">
+            <h4 class="font-semibold mb-2">Criar Novo Setlist</h4>
+            <div class="flex items-end gap-3">
+                <div class="flex-grow">
+                    <label for="setlist-name-input" class="block text-sm mb-1">Nome do Setlist:</label>
+                    <input type="text" id="setlist-name-input" class="w-full p-2 border rounded-md" required>
+                </div>
+                <div class="flex items-center pb-2">
+                    <input id="setlist-is-public-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <label for="setlist-is-public-checkbox" class="ml-2 block text-sm text-gray-900">Público</label>
+                </div>
+                <button type="submit" class="py-2 px-4 bg-indigo-600 text-white rounded-md h-fit">Criar</button>
+            </div>
+            <p id="create-setlist-feedback" class="text-sm mt-2 hidden"></p>
+        </form>
+    </dialog>
+    <dialog id="add-to-setlist-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-sm">
+        <form id="add-to-setlist-form">
+            <h3 class="text-lg font-bold mb-4">Adicionar Música ao Setlist</h3>
+            <div class="space-y-4">
+                <label for="setlist-select" class="block text-sm mb-1">Escolha o setlist:</label>
+                <select id="setlist-select" class="w-full p-2 border rounded-md"></select>
+            </div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button>
+                <button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Adicionar</button>
+            </div>
+        </form>
+    </dialog>
 
     <script>
-    console.log("Script de recuperação - Passo Final (Setlists) iniciado.");
-
     // --- STATE & DOM ---
     const state = { songStructure: [], transposeAmount: 0, currentView: 'chart', isTwoColumns: false };
     const dom = { 
         songInput: document.getElementById('songInput'), generateButton: document.getElementById('generateButton'), saveButton: document.getElementById('saveButton'), clearButton: document.getElementById('clearButton'), outputArea: document.getElementById('outputArea'), summaryArea: document.getElementById('summaryArea'), uniqueChordsArea: document.getElementById('uniqueChordsArea'),
         fullscreenBtn: document.getElementById('fullscreen-btn'), appContainer: document.getElementById('app-container'), transposeStatus: document.getElementById('transpose-status'), loginContainer: document.getElementById('login-container'), loginForm: document.getElementById('login-form'), loginError: document.getElementById('login-error'), welcomeUser: document.getElementById('welcome-user'), logoutBtn: document.getElementById('logout-btn'),
         transposeUpBtn: document.getElementById('transpose-up'), transposeDownBtn: document.getElementById('transpose-down'), lyricsSizeSlider: document.getElementById('lyrics-size'), chordsSizeSlider: document.getElementById('chords-size'), lyricsColorPicker: document.getElementById('lyrics-color'), chordsColorPicker: document.getElementById('chords-color'),
-        viewModeToggle: document.getElementById('view-mode-toggle'), columnsToggle: document.getElementById('columns-toggle'), viewWrapper: document.getElementById('view-wrapper'),
+        viewModeToggle: document.getElementById('view-mode-toggle'), columnsToggle: document.getElementById('columns-toggle'), viewWrapper: document.getElementById('view-wrapper'), 
         saveModal: document.getElementById('save-modal'), saveForm: document.getElementById('save-form'), songTitleInput: document.getElementById('song-title-input'), originalKeyInput: document.getElementById('original-key-input'), isPublicCheckbox: document.getElementById('is-public-checkbox'),
-        openSongsBtn: document.getElementById('open-songs-btn'), songsModal: document.getElementById('songs-modal'), modalSongsList: document.getElementById('modal-songs-list'), mySongsTab: document.getElementById('my-songs-tab'), publicSongsTab: document.getElementById('public-songs-tab'),
+        openSongsBtn: document.getElementById('open-songs-btn'), songsModal: document.getElementById('songs-modal'), modalSongsList: document.getElementById('modal-songs-list'), mySongsTab: document.getElementById('my-songs-tab'), publicSongsTab: document.getElementById('public-songs-tab'), 
         manageUsersBtn: document.getElementById('manage-users-btn'), userManagementModal: document.getElementById('user-management-modal'), modalUsersList: document.getElementById('modal-users-list'), openCreateUserModalBtn: document.getElementById('open-create-user-modal-btn'), createUserModal: document.getElementById('create-user-modal'), createUserForm: document.getElementById('create-user-form'), createUserFeedback: document.getElementById('create-user-feedback'), 
         changePasswordBtn: document.getElementById('change-password-btn'), changePasswordModal: document.getElementById('change-password-modal'), changePasswordForm: document.getElementById('change-password-form'), changePasswordFeedback: document.getElementById('change-password-feedback'),
+        openSetlistsBtn: document.getElementById('open-setlists-btn'), setlistsModal: document.getElementById('setlists-modal'), setlistsModalTitle: document.getElementById('setlists-modal-title'), setlistsTabsNav: document.getElementById('setlists-tabs-nav'), modalSetlistsList: document.getElementById('modal-setlists-list'), mySetlistsTab: document.getElementById('my-setlists-tab'), publicSetlistsTab: document.getElementById('public-setlists-tab'), createSetlistForm: document.getElementById('create-setlist-form'), createSetlistFeedback: document.getElementById('create-setlist-feedback'), setlistsViewContainer: document.getElementById('setlists-view-container'),
+        addToSetlistModal: document.getElementById('add-to-setlist-modal'), 
+        addToSetlistForm: document.getElementById('add-to-setlist-form'), 
+        setlistSelect: document.getElementById('setlist-select')
     };
 
     // --- CORE LOGIC (Processamento da Cifra) ---
@@ -143,6 +190,7 @@
                         <span class="text-xs text-gray-500 ml-2">(${song.original_key || 'N/A'})</span>
                     </div>
                     <div class="flex gap-2">
+                        <button data-song-id="${song.id}" class="add-to-setlist-btn text-blue-500 hover:text-blue-700 p-1" title="Adicionar ao Setlist"><i class="fas fa-plus-circle"></i></button>
                         <button data-id="${song.id}" data-title="${song.title}" class="delete-song-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button>
                     </div>`; 
                 li.querySelector('.flex-1').addEventListener('click', () => { handleLoadSong(song.id); dom.songsModal.close(); }); 
@@ -161,7 +209,7 @@
         event.preventDefault(); 
         dom.createUserFeedback.classList.add('hidden'); 
         const username = dom.createUserForm['new-username'].value; 
-        const password = dom.createUserForm['create-user-password'].value; // ID Corrigido
+        const password = dom.createUserForm['create-user-password'].value;
         try { 
             const data = await fetchApi('/api/users', { method: 'POST', body: { username, password } }); 
             dom.createUserFeedback.textContent = data.message; 
@@ -179,6 +227,8 @@
     async function handleOpenUserManagement() { try { const users = await fetchApi('/api/users'); dom.modalUsersList.innerHTML = ''; if (!users || users.length === 0) return; users.forEach(user => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2'; li.innerHTML = `<span class="text-sm">${user.username}</span>`; if (user.username !== 'admin') { li.innerHTML += `<button data-id="${user.id}" data-username="${user.username}" class="delete-user-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button>`; } dom.modalUsersList.appendChild(li); }); dom.userManagementModal.showModal(); } catch (error) { alert("Não foi possível carregar a lista de usuários."); } }
     async function handleDeleteUserFromModal(e) { if (!e.target.closest('.delete-user-btn')) return; const btn = e.target.closest('.delete-user-btn'); const userId = btn.dataset.id; const username = btn.dataset.username; if (confirm(`Tem certeza que deseja deletar o usuário "${username}"?`)) { try { await fetchApi(`/api/users/${userId}`, { method: 'DELETE' }); handleOpenUserManagement(); } catch (error) { alert('Não foi possível deletar o usuário.'); } } }
     async function handleChangePassword(e) { e.preventDefault(); dom.changePasswordFeedback.classList.add('hidden'); const old_password = dom.changePasswordForm['old-password'].value; const new_password = dom.changePasswordForm['new-password'].value; try { const data = await fetchApi('/api/users/change_password', { method: 'POST', body: { old_password, new_password } }); dom.changePasswordFeedback.textContent = data.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-green-600'; dom.changePasswordForm.reset(); setTimeout(() => dom.changePasswordModal.close(), 1500); } catch (error) { dom.changePasswordFeedback.textContent = error.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-red-600'; } finally { dom.changePasswordFeedback.classList.remove('hidden'); } }
+
+    // --- SETLISTS FUNCTIONS --- (Será adicionado no próximo passo)
 
     // --- UI/DISPLAY LOGIC ---
     function showApp(user) { 
