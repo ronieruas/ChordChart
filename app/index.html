@@ -228,170 +228,30 @@
     async function handleDeleteUserFromModal(e) { if (!e.target.closest('.delete-user-btn')) return; const btn = e.target.closest('.delete-user-btn'); const userId = btn.dataset.id; const username = btn.dataset.username; if (confirm(`Tem certeza que deseja deletar o usuário "${username}"?`)) { try { await fetchApi(`/api/users/${userId}`, { method: 'DELETE' }); handleOpenUserManagement(); } catch (error) { alert('Não foi possível deletar o usuário.'); } } }
     async function handleChangePassword(e) { e.preventDefault(); dom.changePasswordFeedback.classList.add('hidden'); const old_password = dom.changePasswordForm['old-password'].value; const new_password = dom.changePasswordForm['new-password'].value; try { const data = await fetchApi('/api/users/change_password', { method: 'POST', body: { old_password, new_password } }); dom.changePasswordFeedback.textContent = data.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-green-600'; dom.changePasswordForm.reset(); setTimeout(() => dom.changePasswordModal.close(), 1500); } catch (error) { dom.changePasswordFeedback.textContent = error.message; dom.changePasswordFeedback.className = 'text-sm mt-4 text-red-600'; } finally { dom.changePasswordFeedback.classList.remove('hidden'); } }
 
-    // --- SETLISTS FUNCTIONS ---
-    async function handleOpenSetlistsModal() {
-        dom.setlistsTabsNav.classList.remove('hidden');
-        dom.createSetlistForm.classList.remove('hidden');
-        dom.setlistsModalTitle.textContent = 'Gerenciar Setlists';
-        dom.mySetlistsTab.classList.add('active');
-        dom.publicSetlistsTab.classList.remove('active');
-        const backButton = dom.setlistsModal.querySelector('.back-to-setlist-list');
-        if (backButton) backButton.remove();
-        
-        await loadSetlists('my_setlists');
-        dom.setlistsModal.showModal();
+    // --- SETLISTS FUNCTIONS --- (Será adicionado no próximo passo)
+
+    // --- UI/DISPLAY LOGIC ---
+    function showApp(user) { 
+        console.log("showApp foi chamada com sucesso para o usuário:", user.username);
+        dom.loginContainer.classList.add('hidden'); 
+        dom.appContainer.classList.remove('hidden'); 
+        dom.appContainer.classList.add('flex'); 
+        dom.welcomeUser.textContent = `Olá, ${user.username}`; 
+        [dom.logoutBtn, dom.fullscreenBtn, dom.changePasswordBtn].forEach(b => b.classList.remove('hidden')); 
+        dom.manageUsersBtn.classList.toggle('hidden', !user.is_admin); 
+        handleGenerate();
     }
-    async function loadSetlists(filter = 'my_setlists') {
-        try {
-            const setlists = await fetchApi(`/api/setlists?filter=${filter}`);
-            dom.modalSetlistsList.innerHTML = '';
-            if (!setlists || setlists.length === 0) {
-                dom.modalSetlistsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhum setlist encontrado.</p>`;
-                return;
-            }
-            setlists.forEach(setlist => {
-                const li = document.createElement('li');
-                li.className = 'flex justify-between items-center p-2 hover:bg-indigo-100 rounded';
-                li.innerHTML = `
-                    <div class="flex-1 truncate cursor-pointer view-setlist-btn" data-id="${setlist.id}">
-                        <span class="text-sm font-medium">${setlist.name}</span>
-                    </div>
-                    <div class="flex gap-2">
-                        <button data-id="${setlist.id}" data-name="${setlist.name}" class="delete-setlist-btn text-red-500 hover:text-red-700 p-1" title="Deletar">
-                            <i class="fas fa-trash-alt fa-xs"></i>
-                        </button>
-                    </div>`;
-                dom.modalSetlistsList.appendChild(li);
-            });
-        } catch (error) {
-            dom.modalSetlistsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar setlists.</p>';
-        }
+    function showLoginScreen() { 
+        console.log("showLoginScreen foi chamada.");
+        dom.loginContainer.classList.remove('hidden'); 
+        dom.appContainer.classList.add('hidden'); 
+        dom.appContainer.classList.remove('flex'); 
+        [dom.logoutBtn, dom.fullscreenBtn, dom.changePasswordBtn, dom.manageUsersBtn].forEach(b => { if (b) b.classList.add('hidden'); });
     }
-    async function handleCreateSetlist(event) {
-        event.preventDefault();
-        dom.createSetlistFeedback.classList.add('hidden');
-        const form = event.target;
-        const name = form['setlist-name-input'].value;
-        const is_public = form['setlist-is-public-checkbox'].checked;
-        if (!name.trim()) { alert('O nome do setlist não pode estar em branco.'); return; }
-        try {
-            await fetchApi('/api/setlists', { method: 'POST', body: { name, is_public } });
-            form.reset();
-            await loadSetlists(dom.mySetlistsTab.classList.contains('active') ? 'my_setlists' : 'public');
-        } catch (error) {
-            dom.createSetlistFeedback.textContent = `Erro: ${error.message}`;
-            dom.createSetlistFeedback.className = 'text-sm mt-2 text-red-600';
-            dom.createSetlistFeedback.classList.remove('hidden');
-        }
-    }
-    async function viewSetlist(setlistId) {
-        try {
-            const data = await fetchApi(`/api/setlists/${setlistId}`);
-            dom.setlistsTabsNav.classList.add('hidden');
-            dom.createSetlistForm.classList.add('hidden');
-            dom.setlistsModalTitle.textContent = data.name;
 
-            const backButton = document.createElement('button');
-            backButton.innerHTML = '&larr; Voltar para a lista';
-            backButton.className = 'text-sm text-indigo-600 hover:underline mb-4 back-to-setlist-list';
-            backButton.onclick = () => handleOpenSetlistsModal();
-
-            const listContainer = dom.modalSetlistsList;
-            listContainer.innerHTML = '';
-            dom.setlistsViewContainer.after(listContainer); 
-            listContainer.before(backButton);
-
-            if (data.songs && data.songs.length > 0) {
-                data.songs.forEach(song => {
-                    const songLi = document.createElement('li');
-                    songLi.className = 'flex justify-between items-center p-2 border-b';
-                    songLi.dataset.songId = song.id;
-
-                    let liContent = `<div class="flex items-center flex-grow">`;
-                    if (data.is_owner) {
-                        liContent += '<i class="fas fa-grip-vertical text-gray-400 mr-3 handle"></i>';
-                    }
-                    liContent += `<span>${song.title}</span></div>`;
-
-                    if (data.is_owner) {
-                        liContent += `
-                            <button class="remove-song-from-setlist-btn text-red-500 hover:text-red-700 p-1" 
-                                    title="Remover do Setlist" 
-                                    data-song-id="${song.id}" 
-                                    data-setlist-id="${setlistId}">
-                                <i class="fas fa-times-circle"></i>
-                            </button>`;
-                    }
-                    songLi.innerHTML = liContent;
-                    listContainer.appendChild(songLi);
-                });
-            } else {
-                listContainer.innerHTML = '<p class="text-center text-gray-400 text-sm p-4">Este setlist está vazio. Adicione músicas através do modal "Abrir Músicas Salvas".</p>';
-            }
-
-            if (data.is_owner) {
-                new Sortable(listContainer, {
-                    handle: '.handle',
-                    animation: 150,
-                    ghostClass: 'sortable-ghost',
-                    onEnd: async function (evt) {
-                        const items = Array.from(listContainer.children);
-                        const songIds = items.map(item => item.dataset.songId);
-                        try {
-                            await fetchApi(`/api/setlists/${setlistId}/songs/order`, {
-                                method: 'PUT',
-                                body: { song_ids: songIds }
-                            });
-                        } catch (error) {
-                            alert('Não foi possível salvar a nova ordem.');
-                        }
-                    }
-                });
-            }
-
-        } catch (error) {
-            alert(`Erro ao carregar o setlist: ${error.message}`);
-        }
-    }
-    async function handleOpenAddToSetlistModal(songId) {
-        try {
-            const mySetlists = await fetchApi('/api/setlists?filter=my_setlists');
-            dom.setlistSelect.innerHTML = '';
-            if (mySetlists && mySetlists.length > 0) {
-                mySetlists.forEach(setlist => {
-                    const option = document.createElement('option');
-                    option.value = setlist.id;
-                    option.textContent = setlist.name;
-                    dom.setlistSelect.appendChild(option);
-                });
-                dom.addToSetlistModal.dataset.songId = songId;
-                dom.addToSetlistModal.showModal();
-            } else {
-                alert('Você precisa criar um setlist primeiro!');
-            }
-        } catch (error) {
-            alert('Erro ao carregar seus setlists.');
-        }
-    }
-    async function handleAddToSetlistSubmit(event) {
-        event.preventDefault();
-        const songId = dom.addToSetlistModal.dataset.songId;
-        const setlistId = dom.setlistSelect.value;
-        if (!songId || !setlistId) {
-            alert('Erro: Música ou setlist não selecionado.');
-            return;
-        }
-        try {
-            await fetchApi(`/api/setlists/${setlistId}/songs`, {
-                method: 'POST',
-                body: { song_id: songId }
-            });
-            dom.addToSetlistModal.close();
-            alert('Música adicionada com sucesso!');
-        } catch (error) {
-            alert(`Erro: ${error.message}`);
-        }
-    }
+    // --- RENDERING LOGIC ---
+    function applyStyles() { const e = document.getElementById('dynamic-styles'); if (e) e.remove(); const s = document.createElement("style"); s.id = 'dynamic-styles'; s.innerText = `.lyric-output{font-size:${dom.lyricsSizeSlider.value}px;color:${dom.lyricsColorPicker.value};}.chord-output,.summary-chord{font-size:${dom.chordsSizeSlider.value}px;color:${dom.chordsColorPicker.value};}`; document.head.appendChild(s); }
+    function render() { applyStyles(); if (state.songStructure.length === 0) { dom.outputArea.innerHTML = '<p class="text-gray-500 italic">Gere uma cifra ou carregue uma música salva.</p>'; dom.summaryArea.innerHTML = ''; dom.uniqueChordsArea.innerHTML = ''; return; } dom.outputArea.innerHTML = ''; state.songStructure.forEach(s => { const d = document.createElement('div'); d.className = 'mb-6 section-container'; const h = document.createElement('h3'); h.className = 'text-lg font-bold text-gray-800 mb-2'; h.textContent = s.name; d.appendChild(h); s.items.forEach(i => { if (i.type === 'pair' || i.type === 'chords') { const cd = document.createElement('div'); cd.className = 'chord-output mb-1'; cd.textContent = i.chords.replace(CHORD_REGEX_GLOBAL, match => transposeChord(match, state.transposeAmount)); d.appendChild(cd); } if (i.type === 'pair') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'lyrics') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'spacer') { const sd = document.createElement('div'); sd.className = 'h-4'; d.appendChild(sd); } }); if (state.currentView === 'map') { const b = document.createElement('div'); b.className = 'mt-3 p-2 bg-gray-50 rounded-md text-sm flex flex-wrap items-baseline gap-x-2'; const titleSpan = document.createElement('span'); titleSpan.className = 'font-semibold text-gray-600'; titleSpan.textContent = 'Sequência:'; const chordSpan = document.createElement('span'); chordSpan.className = 'summary-chord break-words'; chordSpan.textContent = formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount); b.appendChild(titleSpan); b.appendChild(chordSpan); d.appendChild(b); } dom.outputArea.appendChild(d); }); const allChords = [...new Set(state.songStructure.flatMap(s => s.chordSequence))].map(c => transposeChord(c, state.transposeAmount)); dom.uniqueChordsArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Notas da Música</h2><div class="flex flex-wrap gap-2">${allChords.map(c => `<span class="bg-gray-200 text-gray-800 px-3 py-1 rounded-md text-sm font-medium">${c}</span>`).join('')}</div>`; dom.summaryArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Estrutura Completa</h2><div class="p-4 bg-blue-50 rounded-lg text-sm leading-relaxed">${state.songStructure.filter(s => s.chordSequence.length > 0).map(s => `<strong class="text-blue-800">[${s.name}]</strong> <span class="summary-chord">(${formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount)})</span>`).join(' <span class="font-bold text-blue-400">&rarr;</span> ')}</div>`; }
 
     // --- UI EVENT HANDLERS ---
     function handleModalListClick(event) {
@@ -399,50 +259,6 @@
         if (deleteSongBtn) {
             event.stopPropagation();
             handleDeleteSong(deleteSongBtn.dataset.id, deleteSongBtn.dataset.title);
-            return;
-        }
-        const addToSetlistBtn = event.target.closest('.add-to-setlist-btn');
-        if (addToSetlistBtn) {
-            event.stopPropagation();
-            handleOpenAddToSetlistModal(addToSetlistBtn.dataset.songId);
-            return;
-        }
-    }
-    async function handleSetlistsListClick(event) {
-        const viewBtn = event.target.closest('.view-setlist-btn');
-        if (viewBtn) {
-            event.stopPropagation();
-            viewSetlist(viewBtn.dataset.id);
-            return;
-        }
-        const deleteBtn = event.target.closest('.delete-setlist-btn');
-        if (deleteBtn) {
-            event.stopPropagation();
-            const setlistId = deleteBtn.dataset.id;
-            const setlistName = deleteBtn.dataset.name;
-            if (confirm(`Tem certeza que deseja deletar o setlist "${setlistName}"?`)) {
-                try {
-                    await fetchApi(`/api/setlists/${setlistId}`, { method: 'DELETE' });
-                    loadSetlists(dom.mySetlistsTab.classList.contains('active') ? 'my_setlists' : 'public');
-                } catch (error) {
-                    alert(`Erro ao deletar o setlist: ${error.message}`);
-                }
-            }
-            return;
-        }
-        const removeSongBtn = event.target.closest('.remove-song-from-setlist-btn');
-        if (removeSongBtn) {
-            event.stopPropagation();
-            const songId = removeSongBtn.dataset.songId;
-            const setlistId = removeSongBtn.dataset.setlistId;
-            if (confirm('Remover esta música do setlist?')) {
-                try {
-                    await fetchApi(`/api/setlists/${setlistId}/songs/${songId}`, { method: 'DELETE' });
-                    viewSetlist(setlistId); // Refresh the view
-                } catch (error) {
-                    alert(`Erro ao remover música: ${error.message}`);
-                }
-            }
             return;
         }
     }
@@ -488,14 +304,6 @@
         if(dom.createUserForm) dom.createUserForm.addEventListener('submit', handleCreateUser);
         dom.changePasswordBtn.addEventListener('click', () => { dom.changePasswordFeedback.classList.add('hidden'); dom.changePasswordForm.reset(); dom.changePasswordModal.showModal(); });
         dom.changePasswordForm.addEventListener('submit', handleChangePassword);
-        
-        // Setlists
-        dom.openSetlistsBtn.addEventListener('click', handleOpenSetlistsModal);
-        if(dom.createSetlistForm) dom.createSetlistForm.addEventListener('submit', handleCreateSetlist);
-        if(dom.mySetlistsTab) dom.mySetlistsTab.addEventListener('click', () => { dom.mySetlistsTab.classList.add('active'); dom.publicSetlistsTab.classList.remove('active'); loadSetlists('my_setlists'); });
-        if(dom.publicSetlistsTab) dom.publicSetlistsTab.addEventListener('click', () => { dom.publicSetlistsTab.classList.add('active'); dom.mySetlistsTab.classList.remove('active'); loadSetlists('public'); });
-        if(dom.modalSetlistsList) dom.modalSetlistsList.addEventListener('click', handleSetlistsListClick);
-        if(dom.addToSetlistForm) dom.addToSetlistForm.addEventListener('submit', handleAddToSetlistSubmit);
 
         // Password Visibility Toggle
         document.body.addEventListener('click', function(event) {
