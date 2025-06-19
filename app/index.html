@@ -47,7 +47,12 @@
                 <button id="open-songs-btn" class="w-full bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-md shadow-sm">Abrir Músicas Salvas</button>
                 <button id="open-setlists-btn" class="w-full bg-indigo-700 hover:bg-indigo-800 text-white font-bold py-2 px-4 rounded-md shadow-sm">Gerenciar Setlists</button>
             </div>
-            </aside>
+            <div class="space-y-6">
+                 <div><h3 class="font-semibold text-gray-800 mb-2">Tom da Música</h3><div class="flex items-center justify-center gap-4 bg-gray-50 p-3 rounded-md"><button id="transpose-down" class="px-3 py-1 bg-gray-300 rounded-md text-lg font-bold">-</button><div class="text-center"><span id="transpose-status" class="font-bold text-lg text-blue-600">Original</span></div><button id="transpose-up" class="px-3 py-1 bg-gray-300 rounded-md text-lg font-bold">+</button></div></div>
+                 <div><h3 class="font-semibold text-gray-800 mb-2">Formatação da Cifra</h3><div class="space-y-3 bg-gray-50 p-3 rounded-md"><div class="flex items-center justify-between"><label for="lyrics-size" class="text-sm">Letra:</label><input id="lyrics-size" type="range" min="10" max="32" value="16" class="w-2/3"><input id="lyrics-color" type="color" value="#374151" class="w-8 h-8 p-0 border-none rounded"></div><div class="flex items-center justify-between"><label for="chords-size" class="text-sm">Acordes:</label><input id="chords-size" type="range" min="10" max="32" value="16" class="w-2/3"><input id="chords-color" type="color" value="#2563eb" class="w-8 h-8 p-0 border-none rounded"></div></div></div>
+                 <div><h3 class="font-semibold text-gray-800 mb-2">Layout e Visualização</h3><div class="grid grid-cols-2 gap-2 bg-gray-50 p-3 rounded-md"><button id="view-mode-toggle" class="bg-gray-200 py-2 rounded-md text-sm">Ver Mapa</button><button id="columns-toggle" class="bg-gray-200 py-2 rounded-md text-sm">Usar 2 Colunas</button><button onclick="window.print()" class="col-span-2 bg-green-600 text-white hover:bg-green-700 py-2 rounded-md text-sm">Imprimir / Salvar PDF</button></div><div class="flex justify-center gap-2 mt-2 bg-gray-50 p-3 rounded-md"><button data-view="desktop" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Desktop"><i class="fas fa-desktop"></i></button><button data-view="tablet" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Tablet"><i class="fas fa-tablet-alt"></i></button><button data-view="mobile" class="view-toggle-btn p-2 text-gray-500 hover:text-blue-600" title="Mobile"><i class="fas fa-mobile-alt"></i></button></div></div>
+            </div>
+        </aside>
         <main class="flex-1 p-4 sm:p-8 bg-gray-100">
             <div id="view-wrapper" class="bg-white p-8 rounded-lg shadow-inner min-h-full">
                 <div id="outputArea" class="output-container"></div>
@@ -58,22 +63,32 @@
     </div>
 
     <script>
-    console.log("Script de recuperação iniciado.");
+    console.log("Script de recuperação - Passo 1 (Core) iniciado.");
 
-    // --- DOM ELEMENTS ESSENCIAIS ---
+    // --- STATE & DOM ---
+    const state = { songStructure: [], transposeAmount: 0, currentView: 'chart', isTwoColumns: false };
     const dom = { 
-        appContainer: document.getElementById('app-container'),
-        loginContainer: document.getElementById('login-container'),
-        loginForm: document.getElementById('login-form'),
-        loginError: document.getElementById('login-error'),
-        welcomeUser: document.getElementById('welcome-user'),
-        logoutBtn: document.getElementById('logout-btn'),
-        manageUsersBtn: document.getElementById('manage-users-btn'),
-        changePasswordBtn: document.getElementById('change-password-btn'),
-        fullscreenBtn: document.getElementById('fullscreen-btn')
+        songInput: document.getElementById('songInput'), generateButton: document.getElementById('generateButton'), saveButton: document.getElementById('saveButton'), clearButton: document.getElementById('clearButton'), outputArea: document.getElementById('outputArea'), summaryArea: document.getElementById('summaryArea'), uniqueChordsArea: document.getElementById('uniqueChordsArea'),
+        fullscreenBtn: document.getElementById('fullscreen-btn'), appContainer: document.getElementById('app-container'), transposeStatus: document.getElementById('transpose-status'), loginContainer: document.getElementById('login-container'), loginForm: document.getElementById('login-form'), loginError: document.getElementById('login-error'), welcomeUser: document.getElementById('welcome-user'), logoutBtn: document.getElementById('logout-btn'),
+        transposeUpBtn: document.getElementById('transpose-up'), transposeDownBtn: document.getElementById('transpose-down'), lyricsSizeSlider: document.getElementById('lyrics-size'), chordsSizeSlider: document.getElementById('chords-size'), lyricsColorPicker: document.getElementById('lyrics-color'), chordsColorPicker: document.getElementById('chords-color'),
+        viewModeToggle: document.getElementById('view-mode-toggle'), columnsToggle: document.getElementById('columns-toggle'), viewWrapper: document.getElementById('view-wrapper'),
+        manageUsersBtn: document.getElementById('manage-users-btn'), changePasswordBtn: document.getElementById('change-password-btn')
+        // Outros elementos do DOM serão adicionados nos próximos passos
     };
 
-    // --- FUNÇÕES ESSENCIAIS DE API E AUTH ---
+    // --- CORE LOGIC (Processamento da Cifra) ---
+    const SHARP_SCALE = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
+    const FLAT_SCALE = ['A', 'Bb', 'B', 'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab'];
+    const CHORD_REGEX_SOURCE = `[A-Ga-g]([#b])?(m|min|M|Maj|maj|aug|dim|sus|add|Δ|°|ø)?([1-9][0-5]?)?(\\((#|b)?[1-9][0-3]?((,|,\\s)*(\\s|#|b)?[1-9][0-3]?)*\\))?(sus[24]?)?([/\\\\][A-Ga-g]([#b])?)?`;
+    const CHORD_REGEX_GLOBAL = new RegExp(CHORD_REGEX_SOURCE, 'g');
+    function isChordToken(token) { if (!token) return false; const regex = new RegExp(`^${CHORD_REGEX_SOURCE}$`); return regex.test(token.trim()); }
+    const isPotentiallyChordLine = (line) => { const t = line.trim(); if (!t || /^\[.*\]$/.test(t)) return false; const tokens = t.split(/\s+/).filter(Boolean); return tokens.length > 0 && tokens.every(isChordToken); };
+    function transposeNote(n, a) { let s = n.includes('b') ? FLAT_SCALE : SHARP_SCALE; let i = s.indexOf(n); if (i === -1) return n; return s[(i + a + 12) % 12]; }
+    function transposeChord(c, a) { if (a === 0) return c; const rm = c.match(/^[A-G](#|b)?/); if (!rm) return c; const [mc, bn] = c.split('/'); const r = rm[0]; const q = mc.substring(r.length); const nr = transposeNote(r, a); const tm = nr + q; return bn ? `${tm}/${transposeNote(bn, a)}` : tm; }
+    function formatChordSequenceWithPatterns(chords, transposeAmount) { const tChords = chords.map(c => transposeChord(c, transposeAmount)); if (!tChords || tChords.length === 0) return ""; let r = [], i = 0; while (i < tChords.length) { let fp = false; for (let l = Math.floor((tChords.length - i) / 2); l >= 1; l--) { const p = tChords.slice(i, i + l); let rep = 1; while (i + (rep + 1) * l <= tChords.length) { const ns = tChords.slice(i + rep * l, i + (rep + 1) * l); if (JSON.stringify(p) === JSON.stringify(ns)) rep++; else break; } if (rep > 1) { r.push(`(${p.join(' ')}) ${rep}x`); i += rep * l; fp = true; break; } } if (!fp) { r.push(tChords[i]); i++; } } return r.join(' '); }
+    function parseSong(text) { const lines = text.split('\n'), structure = []; let section = null; const create = n => ({ name: n, items: [], chordSequence: [] }); lines.forEach((l, i) => { const t = l.trim(); if (t.startsWith('[') && t.endsWith(']')) { section = create(t.substring(1, t.length - 1)); structure.push(section); return; } if (!section) { section = create('Introdução/Início'); structure.push(section); } if (t === "") { if (section.items.length > 0) section.items.push({ type: 'spacer' }); return; } if (isPotentiallyChordLine(l)) { const chords = l.match(CHORD_REGEX_GLOBAL) || []; section.chordSequence.push(...chords); const nl = lines[i + 1] || ''; if (nl.trim() && !isPotentiallyChordLine(nl) && !nl.trim().startsWith('[')) { section.items.push({ type: 'pair', chords: l, lyrics: nl }); } else { section.items.push({ type: 'chords', chords: l }); } } else { if (i === 0 || !isPotentiallyChordLine(lines[i - 1])) { section.items.push({ type: 'lyrics', lyrics: l }); } } }); return structure.filter(s => s.items.length > 0 || s.chordSequence.length > 0); }
+    
+    // --- API & AUTH FUNCTIONS ---
     async function fetchApi(path, options = {}) {
         const defaultOptions = { headers: { 'Content-Type': 'application/json' }, credentials: 'include' };
         const mergedOptions = { ...defaultOptions, ...options };
@@ -82,8 +97,7 @@
             const response = await fetch(path, mergedOptions); 
             if (!response.ok) { 
                 if (response.status === 401) { 
-                    showLoginScreen(); 
-                    // Retornar um erro para que a chamada original pare
+                    showLoginScreen();
                     const errorData = await response.json().catch(() => ({error: "Não autorizado"}));
                     throw new Error(errorData.error);
                 } 
@@ -99,83 +113,63 @@
             throw error; 
         }
     }
+    async function checkAuthStatus() { try { const data = await fetchApi('/api/check_auth'); if (data && data.is_logged_in) { showApp(data.user); } else { showLoginScreen(); } } catch (e) { showLoginScreen(); } }
+    async function handleLogin(event) { event.preventDefault(); dom.loginError.classList.add('hidden'); const username = event.target.username.value; const password = event.target.password.value; try { const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); if (data && data.user) { showApp(data.user); } } catch (e) { dom.loginError.textContent = e.message; dom.loginError.classList.remove('hidden'); } }
+    async function handleLogout() { try { await fetchApi('/api/logout', { method: 'POST' }); } finally { showLoginScreen(); } }
 
-    async function checkAuthStatus() { 
-        try { 
-            const data = await fetchApi('/api/check_auth'); 
-            if (data && data.is_logged_in) { 
-                showApp(data.user); 
-            } else { 
-                showLoginScreen(); 
-            } 
-        } catch (e) { 
-            showLoginScreen(); 
-        } 
-    }
-    
-    async function handleLogin(event) { 
-        event.preventDefault(); 
-        dom.loginError.classList.add('hidden'); 
-        const username = event.target.username.value; 
-        const password = event.target.password.value; 
-        try { 
-            const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); 
-            if (data && data.user) { 
-                showApp(data.user); 
-            } 
-        } catch (e) { 
-            dom.loginError.textContent = e.message; 
-            dom.loginError.classList.remove('hidden'); 
-        } 
-    }
-    
-    async function handleLogout() { 
-        try {
-            await fetchApi('/api/logout', { method: 'POST' }); 
-        } finally {
-            showLoginScreen(); 
-        }
-    }
-
-    // --- FUNÇÕES ESSENCIAIS DE UI ---
+    // --- UI/DISPLAY LOGIC ---
     function showApp(user) { 
         console.log("showApp foi chamada com sucesso para o usuário:", user.username);
         dom.loginContainer.classList.add('hidden'); 
         dom.appContainer.classList.remove('hidden'); 
         dom.appContainer.classList.add('flex'); 
         dom.welcomeUser.textContent = `Olá, ${user.username}`; 
-        
-        // Apenas mostra os botões essenciais
-        dom.logoutBtn.classList.remove('hidden');
-        dom.fullscreenBtn.classList.remove('hidden');
-        dom.changePasswordBtn.classList.remove('hidden');
+        [dom.logoutBtn, dom.fullscreenBtn, dom.changePasswordBtn].forEach(b => b.classList.remove('hidden')); 
         dom.manageUsersBtn.classList.toggle('hidden', !user.is_admin); 
+        handleGenerate();
     }
-
     function showLoginScreen() { 
         console.log("showLoginScreen foi chamada.");
         dom.loginContainer.classList.remove('hidden'); 
         dom.appContainer.classList.add('hidden'); 
         dom.appContainer.classList.remove('flex'); 
-        // Esconde todos os botões que precisam de login
-        [dom.logoutBtn, dom.fullscreenBtn, dom.changePasswordBtn, dom.manageUsersBtn].forEach(b => {
-            if (b) b.classList.add('hidden');
-        });
+        [dom.logoutBtn, dom.fullscreenBtn, dom.changePasswordBtn, dom.manageUsersBtn].forEach(b => { if (b) b.classList.add('hidden'); });
     }
 
-    // --- INICIALIZAÇÃO ---
+    // --- RENDERING LOGIC ---
+    function applyStyles() { const e = document.getElementById('dynamic-styles'); if (e) e.remove(); const s = document.createElement("style"); s.id = 'dynamic-styles'; s.innerText = `.lyric-output{font-size:${dom.lyricsSizeSlider.value}px;color:${dom.lyricsColorPicker.value};}.chord-output,.summary-chord{font-size:${dom.chordsSizeSlider.value}px;color:${dom.chordsColorPicker.value};}`; document.head.appendChild(s); }
+    function render() { applyStyles(); if (state.songStructure.length === 0) { dom.outputArea.innerHTML = '<p class="text-gray-500 italic">Gere uma cifra ou carregue uma música salva.</p>'; dom.summaryArea.innerHTML = ''; dom.uniqueChordsArea.innerHTML = ''; return; } dom.outputArea.innerHTML = ''; state.songStructure.forEach(s => { const d = document.createElement('div'); d.className = 'mb-6 section-container'; const h = document.createElement('h3'); h.className = 'text-lg font-bold text-gray-800 mb-2'; h.textContent = s.name; d.appendChild(h); s.items.forEach(i => { if (i.type === 'pair' || i.type === 'chords') { const cd = document.createElement('div'); cd.className = 'chord-output mb-1'; cd.textContent = i.chords.replace(CHORD_REGEX_GLOBAL, match => transposeChord(match, state.transposeAmount)); d.appendChild(cd); } if (i.type === 'pair') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'lyrics') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'spacer') { const sd = document.createElement('div'); sd.className = 'h-4'; d.appendChild(sd); } }); if (state.currentView === 'map') { const b = document.createElement('div'); b.className = 'mt-3 p-2 bg-gray-50 rounded-md text-sm flex flex-wrap items-baseline gap-x-2'; const titleSpan = document.createElement('span'); titleSpan.className = 'font-semibold text-gray-600'; titleSpan.textContent = 'Sequência:'; const chordSpan = document.createElement('span'); chordSpan.className = 'summary-chord break-words'; chordSpan.textContent = formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount); b.appendChild(titleSpan); b.appendChild(chordSpan); d.appendChild(b); } dom.outputArea.appendChild(d); }); const allChords = [...new Set(state.songStructure.flatMap(s => s.chordSequence))].map(c => transposeChord(c, state.transposeAmount)); dom.uniqueChordsArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Notas da Música</h2><div class="flex flex-wrap gap-2">${allChords.map(c => `<span class="bg-gray-200 text-gray-800 px-3 py-1 rounded-md text-sm font-medium">${c}</span>`).join('')}</div>`; dom.summaryArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Estrutura Completa</h2><div class="p-4 bg-blue-50 rounded-lg text-sm leading-relaxed">${state.songStructure.filter(s => s.chordSequence.length > 0).map(s => `<strong class="text-blue-800">[${s.name}]</strong> <span class="summary-chord">(${formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount)})</span>`).join(' <span class="font-bold text-blue-400">&rarr;</span> ')}</div>`; }
+
+    // --- UI EVENT HANDLERS ---
+    function handleGenerate() { state.songStructure = parseSong(dom.songInput.value); state.transposeAmount = 0; updateTransposeStatus(); render(); }
+    function handleClearInput() { dom.songInput.value = ''; handleGenerate(); }
+    function handleTranspose(a) { state.transposeAmount += a; updateTransposeStatus(); render(); }
+    function updateTransposeStatus() { dom.transposeStatus.textContent = state.transposeAmount === 0 ? 'Original' : `${state.transposeAmount > 0 ? '+' : ''}${state.transposeAmount}`; }
+    function handleViewModeToggle() { state.currentView = state.currentView === 'chart' ? 'map' : 'chart'; dom.viewModeToggle.textContent = state.currentView === 'chart' ? 'Ver Mapa' : 'Ver Cifra'; render(); }
+    function handleColumnsToggle() { state.isTwoColumns = !state.isTwoColumns; dom.outputArea.classList.toggle('two-columns', state.isTwoColumns); dom.columnsToggle.textContent = state.isTwoColumns ? 'Usar 1 Coluna' : 'Usar 2 Colunas'; }
+    function handleDeviceViewToggle(d) { dom.viewWrapper.classList.remove('view-desktop', 'view-tablet', 'view-mobile'); if (d !== 'desktop') { dom.viewWrapper.classList.add(`view-${d}`); } }
+    function toggleFullscreen() { if (!document.fullscreenElement) { dom.appContainer.requestFullscreen().catch(err => alert(`Erro ao entrar em tela cheia: ${err.message}`)); } else { document.exitFullscreen(); } }
+
+    // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
-        console.log("DOM carregado. Adicionando listeners essenciais.");
-        if (dom.loginForm) {
-            dom.loginForm.addEventListener('submit', handleLogin);
-        }
-        if (dom.logoutBtn) {
-            dom.logoutBtn.addEventListener('click', handleLogout);
-        }
+        console.log("DOM carregado. Adicionando listeners do core.");
+        dom.loginForm.addEventListener('submit', handleLogin);
+        dom.logoutBtn.addEventListener('click', handleLogout);
+        dom.generateButton.addEventListener('click', handleGenerate);
+        dom.clearButton.addEventListener('click', handleClearInput);
+        dom.transposeUpBtn.addEventListener('click', () => handleTranspose(1));
+        dom.transposeDownBtn.addEventListener('click', () => handleTranspose(-1));
+        [dom.lyricsSizeSlider, dom.chordsSizeSlider, dom.lyricsColorPicker, dom.chordsColorPicker].forEach(el => el.addEventListener('input', render));
+        dom.viewModeToggle.addEventListener('click', handleViewModeToggle);
+        dom.columnsToggle.addEventListener('click', handleColumnsToggle);
+        document.querySelectorAll('.view-toggle-btn').forEach(b => b.addEventListener('click', e => handleDeviceViewToggle(e.currentTarget.dataset.view)));
+        dom.fullscreenBtn.addEventListener('click', toggleFullscreen);
+        
+        // Cifra padrão
+        if (dom.songInput.value.trim() === "") { dom.songInput.value = `[Intro]\nG D Em C\n\n[Verso 1]\n   G              D\nVim para adorar-te\n   Em             C\nVim para prostrar-me\nG              D           C\nVim para dizer que és meu Deus`; }
+        
         checkAuthStatus();
     });
-
-    console.log("Script de recuperação finalizado.");
     </script>
 </body>
 </html>
