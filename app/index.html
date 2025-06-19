@@ -18,25 +18,44 @@
         #view-wrapper { transition: all 0.3s ease-in-out; border: 1px solid #e5e7eb; margin: auto; }
         .view-tablet { width: 768px; }
         .view-mobile { width: 425px; }
-        body:has(.fullscreen-view) { background-color: white !important; }
-        .fullscreen-view { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: white; overflow-y: auto; z-index: 9999; padding: 2rem; }
         dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
         .hidden { display: none; }
         .sortable-ghost { opacity: 0.4; background-color: #c7d2fe; }
         .handle { cursor: move; }
-        @media print { .no-print { display: none !important; } body { background-color: white !important; margin: 0; padding: 0; } main { padding: 0 !important; } #view-wrapper { width: 100% !important; border: none !important; box-shadow: none !important; padding: 1cm !important; } #outputArea { padding: 0 !important; box-shadow: none !important; border: none !important; } .output-container.two-columns { column-count: 2 !important; } h2, h3 { color: black !important; } .chord-output, .summary-chord { color: #1e40af !important; } .lyric-output { color: #111827 !important; } }
-        
-        /* Correção para rolagem em Tela Cheia */
-        .fullscreen-view {
-            display: block; /* Anula o 'flex' para um layout mais simples */
+
+        /* Estilos de Tela Cheia Anteriores - SUBSTITUÍDOS */
+        body:has(#app-container.fullscreen-view) {
+            overflow: hidden; /* Previne a rolagem do body quando o app está em tela cheia */
         }
-        .fullscreen-view aside {
-            display: none; /* Esconde a barra lateral em tela cheia */
+        #app-container.fullscreen-view {
+            display: block !important; /* FORÇA o fim do layout flex, que estava a causar o problema */
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw;
+            height: 100vh !important; /* Garante que a altura seja a da tela */
+            overflow-y: auto !important; /* FORÇA este container a ser o rolável */
+            background-color: white;
+            z-index: 9999;
+            padding: 2rem;
         }
-        .fullscreen-view main {
-            height: 100%; /* Faz a área principal ocupar toda a altura */
-            overflow-y: auto; /* Torna a área principal rolável */
-            padding: 0; /* Remove o padding padrão, pois o pai já tem */
+        #app-container.fullscreen-view > aside {
+            display: none !important; /* Esconde a barra lateral */
+        }
+        #app-container.fullscreen-view > main {
+           height: auto !important; /* Permite que o conteúdo principal cresça o necessário */
+           padding: 0 !important;
+        }
+
+        @media print { 
+            .no-print { display: none !important; } 
+            body { background-color: white !important; margin: 0; padding: 0; } 
+            main { padding: 0 !important; } 
+            #view-wrapper { width: 100% !important; border: none !important; box-shadow: none !important; padding: 1cm !important; } 
+            #outputArea { padding: 0 !important; box-shadow: none !important; border: none !important; } 
+            .output-container.two-columns { column-count: 2 !important; } 
+            h2, h3 { color: black !important; } 
+            .chord-output, .summary-chord { color: #1e40af !important; } 
+            .lyric-output { color: #111827 !important; } 
         }
     </style>
 </head>
