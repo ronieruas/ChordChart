@@ -144,9 +144,11 @@ def get_songs_filtered():
     filter_type = request.args.get('filter', 'my_songs')
     db = get_db()
     if filter_type == 'public':
-        songs = db.execute('SELECT id, title, original_key FROM songs WHERE is_public = 1 ORDER BY title ASC').fetchall()
+        # ALTERAÇÃO: Adicionado COLLATE NOCASE para ordenação case-insensitive
+        songs = db.execute('SELECT id, title, original_key FROM songs WHERE is_public = 1 ORDER BY title COLLATE NOCASE ASC').fetchall()
     else: # Default to 'my_songs'
-        songs = db.execute('SELECT id, title, original_key FROM songs WHERE user_id = ? ORDER BY title ASC', (current_user.id,)).fetchall()
+        # ALTERAÇÃO: Adicionado COLLATE NOCASE para ordenação case-insensitive
+        songs = db.execute('SELECT id, title, original_key FROM songs WHERE user_id = ? ORDER BY title COLLATE NOCASE ASC', (current_user.id,)).fetchall()
     db.close()
     return jsonify([dict(song) for song in songs])
 
