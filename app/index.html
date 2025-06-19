@@ -23,27 +23,29 @@
         .sortable-ghost { opacity: 0.4; background-color: #c7d2fe; }
         .handle { cursor: move; }
 
-        /* Estilos de Tela Cheia Anteriores - SUBSTITUÍDOS */
+        /* Correção Definitiva v3 para Rolagem em Tela Cheia */
         body:has(#app-container.fullscreen-view) {
-            overflow: hidden; /* Previne a rolagem do body quando o app está em tela cheia */
+            overflow: hidden;
         }
         #app-container.fullscreen-view {
-            display: block !important; /* FORÇA o fim do layout flex, que estava a causar o problema */
+            /* Mantém o display flex para controlar os filhos! */
+            display: flex;
             position: fixed;
             top: 0; left: 0;
             width: 100vw;
-            height: 100vh !important; /* Garante que a altura seja a da tela */
-            overflow-y: auto !important; /* FORÇA este container a ser o rolável */
+            height: 100vh;
             background-color: white;
             z-index: 9999;
-            padding: 2rem;
+            padding: 0; /* O padding vai para o <main> */
         }
         #app-container.fullscreen-view > aside {
             display: none !important; /* Esconde a barra lateral */
         }
         #app-container.fullscreen-view > main {
-           height: auto !important; /* Permite que o conteúdo principal cresça o necessário */
-           padding: 0 !important;
+            flex: 1; /* Garante que o main ocupe todo o espaço */
+            overflow-y: auto !important; /* FORÇA a rolagem NESTE elemento */
+            height: 100%;
+            padding: 2rem; /* Adiciona o padding que removemos do pai */
         }
 
         @media print { 
