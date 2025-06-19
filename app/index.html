@@ -62,8 +62,11 @@
         </main>
     </div>
 
+    <dialog id="save-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-md"><h3 class="text-lg font-bold mb-4">Salvar Música</h3><form id="save-form"><div class="space-y-4"><label for="song-title-input" class="block text-sm mb-1">Título da Música:</label><input type="text" id="song-title-input" class="w-full p-2 border rounded-md" required><label for="original-key-input" class="block text-sm mb-1">Tom Original:</label><input type="text" id="original-key-input" class="w-full p-2 border rounded-md" placeholder="Ex: G, Am, C#m"><div class="flex items-center mt-2"><input id="is-public-checkbox" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"><label for="is-public-checkbox" class="ml-2 block text-sm text-gray-900">Compartilhar com todos os usuários</label></div></div><div class="flex justify-end gap-4 mt-6"><button type="button" class="cancel-btn py-2 px-4 bg-gray-200 rounded-md">Cancelar</button><button type="submit" class="py-2 px-4 bg-blue-600 text-white rounded-md">Salvar</button></div></form></dialog>
+    <dialog id="songs-modal" class="p-6 rounded-lg shadow-xl border w-full max-w-lg"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">Músicas Salvas</h3><button class="cancel-btn text-2xl font-light">&times;</button></div><div class="border-b border-gray-200 mb-2"><nav class="-mb-px flex gap-4" aria-label="Tabs"><button id="my-songs-tab" class="tab-btn active whitespace-nowrap border-b-2 py-2 px-1 text-sm font-medium">Minhas Músicas</button><button id="public-songs-tab" class="tab-btn whitespace-nowrap border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Todas as Músicas</button></nav></div><div id="modal-songs-list" class="bg-gray-50 p-2 rounded-md h-96 overflow-y-auto border"></div></dialog>
+    
     <script>
-    console.log("Script de recuperação - Passo 1 (Core) iniciado.");
+    console.log("Script de recuperação - Passo 2 (Músicas) iniciado.");
 
     // --- STATE & DOM ---
     const state = { songStructure: [], transposeAmount: 0, currentView: 'chart', isTwoColumns: false };
@@ -72,8 +75,10 @@
         fullscreenBtn: document.getElementById('fullscreen-btn'), appContainer: document.getElementById('app-container'), transposeStatus: document.getElementById('transpose-status'), loginContainer: document.getElementById('login-container'), loginForm: document.getElementById('login-form'), loginError: document.getElementById('login-error'), welcomeUser: document.getElementById('welcome-user'), logoutBtn: document.getElementById('logout-btn'),
         transposeUpBtn: document.getElementById('transpose-up'), transposeDownBtn: document.getElementById('transpose-down'), lyricsSizeSlider: document.getElementById('lyrics-size'), chordsSizeSlider: document.getElementById('chords-size'), lyricsColorPicker: document.getElementById('lyrics-color'), chordsColorPicker: document.getElementById('chords-color'),
         viewModeToggle: document.getElementById('view-mode-toggle'), columnsToggle: document.getElementById('columns-toggle'), viewWrapper: document.getElementById('view-wrapper'),
-        manageUsersBtn: document.getElementById('manage-users-btn'), changePasswordBtn: document.getElementById('change-password-btn')
-        // Outros elementos do DOM serão adicionados nos próximos passos
+        manageUsersBtn: document.getElementById('manage-users-btn'), changePasswordBtn: document.getElementById('change-password-btn'),
+        // DOM para Músicas
+        saveModal: document.getElementById('save-modal'), saveForm: document.getElementById('save-form'), songTitleInput: document.getElementById('song-title-input'), originalKeyInput: document.getElementById('original-key-input'), isPublicCheckbox: document.getElementById('is-public-checkbox'),
+        openSongsBtn: document.getElementById('open-songs-btn'), songsModal: document.getElementById('songs-modal'), modalSongsList: document.getElementById('modal-songs-list'), mySongsTab: document.getElementById('my-songs-tab'), publicSongsTab: document.getElementById('public-songs-tab'),
     };
 
     // --- CORE LOGIC (Processamento da Cifra) ---
@@ -104,6 +109,7 @@
                 const errorData = await response.json().catch(() => ({error: "Erro desconhecido"})); 
                 throw new Error(errorData.error || `HTTP error! status: ${response.status}`); 
             } 
+            // Corrigido para tratar status 201 e 204 que podem não ter corpo JSON
             if (response.status === 204 || (options.method && options.method.toUpperCase() === 'DELETE') || response.status === 201) { 
                 return await response.json().catch(() => ({})); 
             } 
@@ -116,6 +122,37 @@
     async function checkAuthStatus() { try { const data = await fetchApi('/api/check_auth'); if (data && data.is_logged_in) { showApp(data.user); } else { showLoginScreen(); } } catch (e) { showLoginScreen(); } }
     async function handleLogin(event) { event.preventDefault(); dom.loginError.classList.add('hidden'); const username = event.target.username.value; const password = event.target.password.value; try { const data = await fetchApi('/api/login', { method: 'POST', body: { username, password } }); if (data && data.user) { showApp(data.user); } } catch (e) { dom.loginError.textContent = e.message; dom.loginError.classList.remove('hidden'); } }
     async function handleLogout() { try { await fetchApi('/api/logout', { method: 'POST' }); } finally { showLoginScreen(); } }
+
+    // --- SONGS FUNCTIONS (Reintroduzido) ---
+    async function loadSavedSongs(filter = 'my_songs') { 
+        try { 
+            const songs = await fetchApi(`/api/songs?filter=${filter}`); 
+            dom.modalSongsList.innerHTML = ''; 
+            if (!songs || songs.length === 0) { 
+                dom.modalSongsList.innerHTML = `<p class="text-center text-gray-400 text-sm p-4">Nenhuma música ${filter === 'public' ? 'pública' : 'sua'} encontrada.</p>`; 
+                return; 
+            } 
+            songs.forEach(song => { 
+                const li = document.createElement('li'); 
+                li.className = 'flex justify-between items-center p-2 hover:bg-blue-100 rounded'; 
+                li.innerHTML = `
+                    <div class="flex-1 truncate cursor-pointer">
+                        <span class="text-sm font-medium">${song.title}</span>
+                        <span class="text-xs text-gray-500 ml-2">(${song.original_key || 'N/A'})</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button data-id="${song.id}" data-title="${song.title}" class="delete-song-btn text-red-500 hover:text-red-700 p-1" title="Deletar"><i class="fas fa-trash-alt fa-xs"></i></button>
+                    </div>`; 
+                li.querySelector('.flex-1').addEventListener('click', () => { handleLoadSong(song.id); dom.songsModal.close(); }); 
+                dom.modalSongsList.appendChild(li); 
+            }); 
+        } catch (error) { 
+            dom.modalSongsList.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Erro ao carregar músicas.</p>'; 
+        } 
+    }
+    async function handleLoadSong(songId) { try { const song = await fetchApi(`/api/songs/${songId}`); dom.songInput.value = song.content; handleGenerate(); } catch (error) { alert('Não foi possível carregar a música.'); } }
+    async function handleDeleteSong(songId, songTitle) { if (confirm(`Tem certeza que deseja deletar "${songTitle}"?`)) { try { await fetchApi(`/api/songs/${songId}`, { method: 'DELETE' }); loadSavedSongs(dom.mySongsTab.classList.contains('active') ? 'my_songs' : 'public'); } catch (error) { alert(error.message); } } }
+    async function handleSaveSong(event) { event.preventDefault(); const title = dom.songTitleInput.value; const content = dom.songInput.value; const original_key = dom.originalKeyInput.value; const is_public = dom.isPublicCheckbox.checked; if (!title || !content.trim()) { alert('Título e conteúdo da cifra são obrigatórios.'); return; } try { await fetchApi('/api/songs', { method: 'POST', body: { title, content, original_key, is_public } }); dom.saveModal.close(); dom.saveForm.reset(); } catch (error) { alert('Não foi possível salvar a música.'); } }
 
     // --- UI/DISPLAY LOGIC ---
     function showApp(user) { 
@@ -141,6 +178,14 @@
     function render() { applyStyles(); if (state.songStructure.length === 0) { dom.outputArea.innerHTML = '<p class="text-gray-500 italic">Gere uma cifra ou carregue uma música salva.</p>'; dom.summaryArea.innerHTML = ''; dom.uniqueChordsArea.innerHTML = ''; return; } dom.outputArea.innerHTML = ''; state.songStructure.forEach(s => { const d = document.createElement('div'); d.className = 'mb-6 section-container'; const h = document.createElement('h3'); h.className = 'text-lg font-bold text-gray-800 mb-2'; h.textContent = s.name; d.appendChild(h); s.items.forEach(i => { if (i.type === 'pair' || i.type === 'chords') { const cd = document.createElement('div'); cd.className = 'chord-output mb-1'; cd.textContent = i.chords.replace(CHORD_REGEX_GLOBAL, match => transposeChord(match, state.transposeAmount)); d.appendChild(cd); } if (i.type === 'pair') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'lyrics') { const ld = document.createElement('div'); ld.className = 'lyric-output'; ld.textContent = i.lyrics; d.appendChild(ld); } if (i.type === 'spacer') { const sd = document.createElement('div'); sd.className = 'h-4'; d.appendChild(sd); } }); if (state.currentView === 'map') { const b = document.createElement('div'); b.className = 'mt-3 p-2 bg-gray-50 rounded-md text-sm flex flex-wrap items-baseline gap-x-2'; const titleSpan = document.createElement('span'); titleSpan.className = 'font-semibold text-gray-600'; titleSpan.textContent = 'Sequência:'; const chordSpan = document.createElement('span'); chordSpan.className = 'summary-chord break-words'; chordSpan.textContent = formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount); b.appendChild(titleSpan); b.appendChild(chordSpan); d.appendChild(b); } dom.outputArea.appendChild(d); }); const allChords = [...new Set(state.songStructure.flatMap(s => s.chordSequence))].map(c => transposeChord(c, state.transposeAmount)); dom.uniqueChordsArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Notas da Música</h2><div class="flex flex-wrap gap-2">${allChords.map(c => `<span class="bg-gray-200 text-gray-800 px-3 py-1 rounded-md text-sm font-medium">${c}</span>`).join('')}</div>`; dom.summaryArea.innerHTML = `<h2 class="text-xl font-bold text-gray-800 mb-2 mt-4 border-t pt-4">Estrutura Completa</h2><div class="p-4 bg-blue-50 rounded-lg text-sm leading-relaxed">${state.songStructure.filter(s => s.chordSequence.length > 0).map(s => `<strong class="text-blue-800">[${s.name}]</strong> <span class="summary-chord">(${formatChordSequenceWithPatterns(s.chordSequence, state.transposeAmount)})</span>`).join(' <span class="font-bold text-blue-400">&rarr;</span> ')}</div>`; }
 
     // --- UI EVENT HANDLERS ---
+    function handleModalListClick(event) {
+        const deleteSongBtn = event.target.closest('.delete-song-btn');
+        if (deleteSongBtn) {
+            event.stopPropagation();
+            handleDeleteSong(deleteSongBtn.dataset.id, deleteSongBtn.dataset.title);
+            return;
+        }
+    }
     function handleGenerate() { state.songStructure = parseSong(dom.songInput.value); state.transposeAmount = 0; updateTransposeStatus(); render(); }
     function handleClearInput() { dom.songInput.value = ''; handleGenerate(); }
     function handleTranspose(a) { state.transposeAmount += a; updateTransposeStatus(); render(); }
@@ -152,9 +197,12 @@
 
     // --- INITIALIZATION ---
     document.addEventListener('DOMContentLoaded', () => {
-        console.log("DOM carregado. Adicionando listeners do core.");
+        console.log("DOM carregado. Adicionando listeners.");
+        // Auth
         dom.loginForm.addEventListener('submit', handleLogin);
         dom.logoutBtn.addEventListener('click', handleLogout);
+        
+        // Core
         dom.generateButton.addEventListener('click', handleGenerate);
         dom.clearButton.addEventListener('click', handleClearInput);
         dom.transposeUpBtn.addEventListener('click', () => handleTranspose(1));
@@ -164,7 +212,16 @@
         dom.columnsToggle.addEventListener('click', handleColumnsToggle);
         document.querySelectorAll('.view-toggle-btn').forEach(b => b.addEventListener('click', e => handleDeviceViewToggle(e.currentTarget.dataset.view)));
         dom.fullscreenBtn.addEventListener('click', toggleFullscreen);
-        
+
+        // Songs
+        document.querySelectorAll('.cancel-btn').forEach(b => b.addEventListener('click', (e) => e.target.closest('dialog').close()));
+        dom.saveButton.addEventListener('click', () => { if (dom.songInput.value.trim()) { dom.saveModal.showModal(); } else { alert("Por favor, cole uma cifra antes de salvar."); } });
+        dom.saveForm.addEventListener('submit', handleSaveSong);
+        dom.openSongsBtn.addEventListener('click', () => { dom.mySongsTab.classList.add('active'); dom.publicSongsTab.classList.remove('active'); loadSavedSongs('my_songs'); dom.songsModal.showModal(); });
+        dom.mySongsTab.addEventListener('click', () => { dom.mySongsTab.classList.add('active'); dom.publicSongsTab.classList.remove('active'); loadSavedSongs('my_songs'); });
+        dom.publicSongsTab.addEventListener('click', () => { dom.publicSongsTab.classList.add('active'); dom.mySongsTab.classList.remove('active'); loadSavedSongs('public'); });
+        dom.modalSongsList.addEventListener('click', handleModalListClick);
+
         // Cifra padrão
         if (dom.songInput.value.trim() === "") { dom.songInput.value = `[Intro]\nG D Em C\n\n[Verso 1]\n   G              D\nVim para adorar-te\n   Em             C\nVim para prostrar-me\nG              D           C\nVim para dizer que és meu Deus`; }
         
