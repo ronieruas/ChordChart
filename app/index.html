@@ -82,7 +82,7 @@
                 <button id="my-setlists-tab" class="tab-btn active whitespace-nowrap border-b-2 py-2 px-1 text-sm font-medium">Meus Setlists</button>
                 <button id="public-setlists-tab" class="tab-btn whitespace-nowrap border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:border-gray-300 hover:text-gray-700">Setlists Públicos</button>
             </nav>
-            </div>
+        </div>
         <div id="modal-setlists-list" class="bg-gray-50 p-2 rounded-md h-80 overflow-y-auto border-x border-b mb-4"></div>
         <form id="create-setlist-form" class="p-4 border-t">
             <h4 class="font-semibold mb-2">Criar Novo Setlist</h4>
@@ -125,7 +125,10 @@
         manageUsersBtn: document.getElementById('manage-users-btn'), userManagementModal: document.getElementById('user-management-modal'), modalUsersList: document.getElementById('modal-users-list'), openCreateUserModalBtn: document.getElementById('open-create-user-modal-btn'), createUserModal: document.getElementById('create-user-modal'), createUserForm: document.getElementById('create-user-form'), createUserFeedback: document.getElementById('create-user-feedback'), 
         changePasswordBtn: document.getElementById('change-password-btn'), changePasswordModal: document.getElementById('change-password-modal'), changePasswordForm: document.getElementById('change-password-form'), changePasswordFeedback: document.getElementById('change-password-feedback'),
         openSetlistsBtn: document.getElementById('open-setlists-btn'), setlistsModal: document.getElementById('setlists-modal'), setlistsModalTitle: document.getElementById('setlists-modal-title'), setlistsTabsNav: document.getElementById('setlists-tabs-nav'), modalSetlistsList: document.getElementById('modal-setlists-list'), mySetlistsTab: document.getElementById('my-setlists-tab'), publicSetlistsTab: document.getElementById('public-setlists-tab'), createSetlistForm: document.getElementById('create-setlist-form'), createSetlistFeedback: document.getElementById('create-setlist-feedback'), setlistsViewContainer: document.getElementById('setlists-view-container'),
-        addToSetlistModal: document.getElementById('add-to-setlist-modal'), addToSetlistForm: document.getElementById('add-to-setlist-form'), setlistSelect: document.getElementById('setlist-select')
+        // A VÍRGULA ABAIXO FOI ADICIONADA PARA CORRIGIR O ERRO
+        addToSetlistModal: document.getElementById('add-to-setlist-modal'), 
+        addToSetlistForm: document.getElementById('add-to-setlist-form'), 
+        setlistSelect: document.getElementById('setlist-select')
     };
 
     // --- CONSTANTS & CORE LOGIC ---
@@ -196,8 +199,6 @@
         dom.setlistsModalTitle.textContent = 'Gerenciar Setlists';
         dom.mySetlistsTab.classList.add('active');
         dom.publicSetlistsTab.classList.remove('active');
-        // Limpar a lista antiga antes de carregar a nova
-        dom.modalSetlistsList.innerHTML = '';
         const backButton = dom.setlistsModal.querySelector('.back-to-setlist-list');
         if (backButton) backButton.remove();
         
@@ -272,7 +273,7 @@
 
                     let liContent = `<div class="flex items-center flex-grow">`;
                     if (data.is_owner) {
-                        liContent += '<i class="fas fa-grip-vertical text-gray-400 mr-3 cursor-move handle"></i>';
+                        liContent += '<i class="fas fa-grip-vertical text-gray-400 mr-3 handle"></i>';
                     }
                     liContent += `<span>${song.title}</span></div>`;
 
